@@ -1,0 +1,33 @@
+{
+	"id": "/",
+	"name": "Crisis Incident Reporting",
+	"short_name": "Crisis Report",
+	"description": "Report emergencies, watch a live incident map, and send a one-tap SOS.",
+	"start_url": "/",
+	"scope": "/",
+	"display": "standalone",
+	"orientation": "any",
+	"background_color": "#0b1220",
+	"theme_color": "#dc2626",
+	"categories": ["utilities", "news"],
+	"icons": [
+		{
+			"src": "/pwa-192.png",
+			"sizes": "192x192",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/pwa-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/pwa-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "maskable"
+		}
+	]
+}

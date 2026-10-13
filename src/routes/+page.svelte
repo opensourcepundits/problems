@@ -1,0 +1,240 @@
+<script lang="ts">
+	import { browser } from '$app/environment';
+	import { goto } from '$app/navigation';
+	import { Grid3x3, MapPin, Plus } from 'lucide-svelte';
+	import { onMount } from 'svelte';
+	import IncidentCard from '$lib/components/IncidentCard.svelte';
+	import MapGridHeatmap from '$lib/components/MapGridHeatmap.svelte';
+	import MapPinView from '$lib/components/MapPinView.svelte';
+	import ReportModal from '$lib/components/ReportModal.svelte';
+	import { fetchIncidents } from '$lib/api';
+	import { createSupabaseBrowserClient } from '$lib/supabaseClient';
+	import {
+		CATEGORIES,
+		CATEGORY_LABEL,
+		TIME_WINDOWS,
+		type Category,
+		type Incident,
+		type TileBounds,
+		type Viewport
+	} from '$lib/types';
+	import { mapCommand, pushToast } from '$lib/ui.svelte';
+
+	let { data } = $props();
+
+	let mode = $state<'pins' | 'grid'>('pins');
+	let hours = $state(24);
+	let category = $state<Category | 'all'>('all');
+	let viewport = $state<Viewport>({ center: [0, 15], zoom: 2 });
+	let bounds = $state<TileBounds | null>(null);
+	let focusNonce = $state(0);
+	let focusBounds = $state<[[number, number], [number, number]] | null>(null);
+	let incidents = $state<Incident[]>([]);
+	let selectedId = $state<string | null>(null);
+	let reportOpen = $state(false);
+	let loading = $state(false);
+	let error = $state('');
+	let seenCommand = 0;
+
+	const selected = $derived(incidents.find((incident) => incident.id === selectedId) ?? null);
+
+	async function load() {
+		const supabase = createSupabaseBrowserClient();
+		if (!supabase) {
+			error = '';
+			incidents = [];
+			return;
+		}
+		loading = true;
+		error = '';
+		try {
+			incidents = await fetchIncidents(supabase, hours, category, mode === 'pins' ? bounds : null);
+			if (selectedId && !incidents.some((incident) => incident.id === selectedId)) selectedId = null;
+		} catch (cause) {
+			error = cause instanceof Error ? cause.message : 'Could not load incidents.';
+		} finally {
+			loading = false;
+		}
+	}
+
+	function openReport() {
+		if (!data.user) {
+			pushToast('Sign in to file a report.', 'err');
+			void goto('/auth/login?next=/');
+			return;
+		}
+		reportOpen = true;
+	}
+
+	function drillDown(tile: TileBounds) {
+		bounds = tile;
+		focusBounds = [
+			[tile.minLng, tile.minLat],
+			[tile.maxLng, tile.maxLat]
+		];
+		focusNonce += 1;
+		mode = 'pins';
+	}
+
+	function onCreated(id: string, lng: number, lat: number) {
+		reportOpen = false;
+		mode = 'pins';
+		bounds = null;
+		viewport = { center: [lng, lat], zoom: 15 };
+		selectedId = id;
+		void load();
+	}
+
+	$effect(() => {
+		void hours;
+		void category;
+		void bounds;
+		void mode;
+		if (browser) void load();
+	});
+
+	$effect(() => {
+		if (!browser || mapCommand.nonce === 0 || mapCommand.nonce === seenCommand) return;
+		seenCommand = mapCommand.nonce;
+		mode = 'pins';
+		category = 'all';
+		bounds = null;
+		viewport = { center: [mapCommand.lng, mapCommand.lat], zoom: 15 };
+		selectedId = mapCommand.incidentId;
+		void load();
+	});
+
+	onMount(() => {
+		const supabase = createSupabaseBrowserClient();
+		if (!supabase) return;
+		const refresh = () => void load();
+		const channel = supabase
+			.channel('crisis-feed')
+			.on('postgres_changes', { event: '*', schema: 'public', table: 'incidents' }, refresh)
+			.on('postgres_changes', { event: '*', schema: 'public', table: 'incident_comments' }, refresh)
+			.on('postgres_changes', { event: '*', schema: 'public', table: 'incident_confirmations' }, refresh)
+			.subscribe();
+		return () => {
+			void supabase.removeChannel(channel);
+		};
+	});
+</script>
+
+<svelte:window
+	onkeydown={(event) => {
+		if (event.key === 'Escape') {
+			reportOpen = false;
+			selectedId = null;
+		}
+	}}
+/>
+
+<div class="absolute inset-0">
+	{#if mode === 'pins'}
+		<MapPinView
+			{incidents}
+			{viewport}
+			{focusNonce}
+			{focusBounds}
+			onViewport={(next) => (viewport = next)}
+			onSelect={(id) => (selectedId = id)}
+		/>
+	{:else}
+		<MapGridHeatmap {hours} {category} {viewport} onViewport={(next) => (viewport = next)} onDrillDown={drillDown} />
+	{/if}
+</div>
+
+<div class="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col gap-2 p-3 pr-16">
+	<div class="pointer-events-auto flex flex-wrap items-center gap-2">
+		<div class="flex rounded-full bg-slate-950/90 p-1 text-sm shadow-lg">
+			<button
+				type="button"
+				class="inline-flex items-center gap-1 rounded-full px-3 py-1.5 {mode === 'pins' ? 'bg-white text-slate-950' : 'text-slate-200'}"
+				aria-pressed={mode === 'pins'}
+				onclick={() => (mode = 'pins')}
+			>
+				<MapPin size={14} /> Exact pins
+			</button>
+			<button
+				type="button"
+				class="inline-flex items-center gap-1 rounded-full px-3 py-1.5 {mode === 'grid' ? 'bg-white text-slate-950' : 'text-slate-200'}"
+				aria-pressed={mode === 'grid'}
+				onclick={() => (mode = 'grid')}
+			>
+				<Grid3x3 size={14} /> 5km zones
+			</button>
+		</div>
+		<div class="flex rounded-full bg-slate-950/90 p-1 text-sm shadow-lg">
+			{#each TIME_WINDOWS as window (window.hours)}
+				<button
+					type="button"
+					class="rounded-full px-2.5 py-1.5 {hours === window.hours ? 'bg-red-600 text-white' : 'text-slate-200'}"
+					onclick={() => (hours = window.hours)}
+				>
+					{window.label}
+				</button>
+			{/each}
+		</div>
+		<button type="button" class="inline-flex items-center gap-1 rounded-full bg-red-600 px-3 py-2 text-sm font-semibold shadow-lg" onclick={openReport}>
+			<Plus size={16} /> Report
+		</button>
+		<span class="rounded-full bg-slate-950/80 px-3 py-1.5 text-xs text-slate-300">
+			{loading ? 'Updating…' : `${incidents.length} reports`}
+		</span>
+	</div>
+
+	<div class="pointer-events-auto flex gap-2 overflow-x-auto pb-1">
+		<button
+			type="button"
+			class="shrink-0 rounded-full px-3 py-1 text-sm {category === 'all' ? 'bg-white text-slate-950' : 'bg-slate-950/85 text-slate-200'}"
+			onclick={() => (category = 'all')}
+		>
+			All
+		</button>
+		{#each CATEGORIES as item (item)}
+			<button
+				type="button"
+				class="shrink-0 rounded-full px-3 py-1 text-sm {category === item ? 'bg-white text-slate-950' : 'bg-slate-950/85 text-slate-200'}"
+				onclick={() => (category = item)}
+			>
+				{CATEGORY_LABEL[item]}
+			</button>
+		{/each}
+	</div>
+
+	{#if bounds && mode === 'pins'}
+		<button
+			type="button"
+			class="pointer-events-auto w-fit rounded-full bg-amber-400 px-3 py-1 text-sm font-medium text-slate-950"
+			onclick={() => {
+				bounds = null;
+				focusBounds = null;
+			}}
+		>
+			Showing one 5km square · Clear
+		</button>
+	{/if}
+	{#if error}
+		<p class="pointer-events-auto w-fit max-w-md rounded-xl bg-red-950/90 px-3 py-2 text-sm text-red-100">{error}</p>
+	{/if}
+</div>
+
+{#if mode === 'grid'}
+	<div class="pointer-events-none absolute bottom-6 left-3 z-10 rounded-2xl bg-slate-950/85 px-3 py-2 text-xs text-slate-200 shadow-lg">
+		<p class="mb-1 font-medium">Incidents per 5km square</p>
+		<div class="flex items-center gap-2">
+			<span class="h-2 w-6 rounded bg-yellow-400"></span>
+			<span class="h-2 w-6 rounded bg-orange-500"></span>
+			<span class="h-2 w-6 rounded bg-red-600"></span>
+			<span class="h-2 w-6 rounded bg-purple-700"></span>
+		</div>
+	</div>
+{/if}
+
+{#if reportOpen && data.user}
+	<ReportModal userId={data.user.id} onClose={() => (reportOpen = false)} {onCreated} />
+{/if}
+
+{#if selected}
+	<IncidentCard incident={selected} userId={data.user?.id ?? null} onClose={() => (selectedId = null)} onChanged={() => void load()} />
+{/if}

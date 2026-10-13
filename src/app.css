@@ -1,0 +1,67 @@
+@import 'tailwindcss';
+
+@theme {
+	--font-sans: 'Segoe UI', ui-sans-serif, system-ui, sans-serif;
+}
+
+html,
+body {
+	height: 100%;
+}
+
+body {
+	margin: 0;
+	background: #0b1220;
+	color: #e8eef9;
+	font-family: var(--font-sans);
+	-webkit-font-smoothing: antialiased;
+}
+
+.maplibregl-ctrl-attrib {
+	background: rgba(11, 18, 32, 0.8) !important;
+	color: #cbd5e1 !important;
+}
+
+.maplibregl-ctrl-attrib a {
+	color: #fecaca !important;
+}
+
+.crisis-popup .maplibregl-popup-content {
+	background: #111827;
+	color: #e8eef9;
+	border-radius: 14px;
+	padding: 12px 14px;
+	box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+
+.crisis-popup .maplibregl-popup-close-button {
+	color: #e8eef9;
+	font-size: 18px;
+	padding: 4px 8px;
+}
+
+.crisis-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+.crisis-popup.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.crisis-popup.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
+	border-top-color: #111827;
+}
+
+.crisis-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.crisis-popup.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.crisis-popup.maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
+	border-bottom-color: #111827;
+}
+
+.crisis-popup.maplibregl-popup-anchor-left .maplibregl-popup-tip {
+	border-right-color: #111827;
+}
+
+.crisis-popup.maplibregl-popup-anchor-right .maplibregl-popup-tip {
+	border-left-color: #111827;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.sos-pulse {
+		animation: none !important;
+	}
+}
