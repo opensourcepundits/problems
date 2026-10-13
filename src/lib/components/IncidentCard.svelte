@@ -120,13 +120,18 @@
 			</button>
 		</div>
 
+		<p class="mb-3 whitespace-pre-wrap text-sm leading-6 text-slate-200">{incident.description || 'No description.'}</p>
+		{#if incident.address_hint}
+			<p class="mb-3 text-sm text-slate-400">{incident.address_hint}</p>
+		{/if}
+
 		{#if activeMedia}
 			<div class="relative mb-4 overflow-hidden rounded-2xl bg-black">
 				{#if isVideo(activeMedia)}
 					<!-- svelte-ignore a11y_media_has_caption -->
-					<video class="max-h-64 w-full" src={activeMedia} controls></video>
+					<video class="max-h-80 w-full bg-black" src={activeMedia} controls></video>
 				{:else}
-					<img class="max-h-64 w-full object-cover" src={activeMedia} alt="" />
+					<img class="max-h-80 w-full bg-black object-contain" src={activeMedia} alt={incident.title} />
 				{/if}
 				{#if media.length > 1}
 					<div class="absolute right-2 bottom-2 rounded-full bg-slate-950/80 px-2 py-1 text-xs">
@@ -136,11 +141,6 @@
 					<button type="button" class="absolute top-1/2 right-2 -translate-y-1/2 rounded-full bg-slate-950/80 px-2 py-1" onclick={() => (mediaIndex = (mediaIndex + 1) % media.length)} aria-label="Next media">›</button>
 				{/if}
 			</div>
-		{/if}
-
-		<p class="mb-3 whitespace-pre-wrap text-sm leading-6 text-slate-200">{incident.description || 'No description.'}</p>
-		{#if incident.address_hint}
-			<p class="mb-4 text-sm text-slate-400">{incident.address_hint}</p>
 		{/if}
 
 		<div class="mb-2 grid grid-cols-2 gap-2" role="group" aria-label="Confirm or deny this report">
