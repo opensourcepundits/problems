@@ -3,9 +3,10 @@
 	import 'maplibre-gl/dist/maplibre-gl.css';
 	import { addIncidentIcons, CATEGORY_ICON } from '$lib/mapIcons';
 	import { osmStyle } from '$lib/mapStyle';
-	import type { Incident, Viewport } from '$lib/types';
+	import { squareGrid } from '$lib/squares';
+	import { CATEGORY_LABEL, isCategory, type Incident, type TileBounds, type Viewport } from '$lib/types';
 	import type { FeatureCollection, Point } from 'geojson';
-	import type { GeoJSONSource, Map } from 'maplibre-gl';
+	import type { ExpressionSpecification, GeoJSONSource, Map, Popup } from 'maplibre-gl';
 
 	let {
 		incidents,
@@ -14,9 +15,12 @@
 		focusBounds = null,
 		picking = false,
 		draftPin = null,
+		showZones = false,
+		cellKm = 5,
 		onViewport,
 		onSelect,
-		onPick
+		onPick,
+		onDrillDown
 	}: {
 		incidents: Incident[];
 		viewport: Viewport;
@@ -24,9 +28,12 @@
 		focusBounds?: [[number, number], [number, number]] | null;
 		picking?: boolean;
 		draftPin?: { lng: number; lat: number } | null;
+		showZones?: boolean;
+		cellKm?: number;
 		onViewport: (viewport: Viewport) => void;
 		onSelect: (id: string) => void;
 		onPick?: (lng: number, lat: number) => void;
+		onDrillDown?: (bounds: TileBounds) => void;
 	} = $props();
 
 	let container = $state<HTMLDivElement | undefined>(undefined);
@@ -34,10 +41,60 @@
 	let ready = $state(false);
 	let applying = false;
 	let seenFocus = 0;
+	let popup: Popup | undefined;
 	const interaction = {
 		picking: false,
-		onPick: (_lng: number, _lat: number) => {}
+		showZones: false,
+		cellKm: 5,
+		onPick: (_lng: number, _lat: number) => {},
+		onDrillDown: (_bounds: TileBounds) => {}
 	};
+
+	const zoneCount: ExpressionSpecification = ['to-number', ['get', 'total_count']];
+	const zoneColor: ExpressionSpecification = [
+		'interpolate',
+		['linear'],
+		zoneCount,
+		0,
+		'#f1f5f9',
+		1,
+		'#fde047',
+		2,
+		'#facc15',
+		3,
+		'#fbbf24',
+		5,
+		'#f59e0b',
+		8,
+		'#fb923c',
+		12,
+		'#f97316',
+		18,
+		'#ea580c',
+		26,
+		'#ef4444',
+		36,
+		'#dc2626',
+		50,
+		'#b91c1c',
+		70,
+		'#7e22ce'
+	];
+	const zoneOpacity: ExpressionSpecification = [
+		'interpolate',
+		['linear'],
+		zoneCount,
+		0,
+		0.45,
+		1,
+		0.58,
+		5,
+		0.66,
+		18,
+		0.76,
+		50,
+		0.88
+	];
 
 	function collection(): FeatureCollection<Point> {
 		return {
@@ -58,6 +115,19 @@
 	function paint() {
 		const source = map?.getSource('incidents') as GeoJSONSource | undefined;
 		source?.setData(collection());
+	}
+
+	function escapeHtml(value: string) {
+		return value.replace(/[&<>"']/g, (char) => {
+			const named: Record<string, string> = {
+				'&': '&amp;',
+				'<': '&lt;',
+				'>': '&gt;',
+				'"': '&quot;',
+				"'": '&#39;'
+			};
+			return named[char] ?? char;
+		});
 	}
 
 	onMount(() => {
@@ -87,6 +157,38 @@
 
 			local.on('load', () => {
 				if (!local) return;
+				local.addSource('zones', {
+					type: 'geojson',
+					data: { type: 'FeatureCollection', features: [] }
+				});
+				local.addLayer({
+					id: 'zones-fill',
+					type: 'fill',
+					source: 'zones',
+					layout: { visibility: 'none' },
+					paint: {
+						'fill-color': zoneColor,
+						'fill-opacity': zoneOpacity
+					}
+				});
+				local.addLayer({
+					id: 'zones-line',
+					type: 'line',
+					source: 'zones',
+					layout: { visibility: 'none' },
+					paint: {
+						'line-color': [
+							'interpolate',
+							['linear'],
+							zoneCount,
+							0,
+							'#94a3b8',
+							70,
+							'#3b0764'
+						],
+						'line-width': 1
+					}
+				});
 				local.addSource('incidents', {
 					type: 'geojson',
 					data: collection(),
@@ -182,9 +284,45 @@
 				onViewport({ center: [center.lng, center.lat], zoom: local.getZoom() });
 			});
 
+			local.on('click', 'zones-fill', (event) => {
+				if (interaction.picking || !interaction.showZones || !local) return;
+				const feature = event.features?.[0];
+				const props = feature?.properties;
+				if (!props) return;
+				const total = Number(props.total_count ?? 0);
+				const critical = Number(props.critical_count ?? 0);
+				const categoryRaw = props.top_category == null ? '' : String(props.top_category);
+				const category = isCategory(categoryRaw)
+					? CATEGORY_LABEL[categoryRaw]
+					: total === 0
+						? 'None'
+						: escapeHtml(categoryRaw || 'Other');
+				const bounds = {
+					minLng: Number(props.min_lng),
+					minLat: Number(props.min_lat),
+					maxLng: Number(props.max_lng),
+					maxLat: Number(props.max_lat)
+				};
+				popup?.remove();
+				popup = new maplibregl.Popup({ className: 'crisis-popup', maxWidth: '260px' })
+					.setLngLat(event.lngLat)
+					.setHTML(
+						`<p class="text-xs uppercase tracking-wide text-slate-400">${interaction.cellKm} km square</p>
+						<p class="mt-1 text-lg font-semibold">${total} events</p>
+						<p class="text-sm text-red-300">${critical} critical</p>
+						<p class="mt-1 text-sm text-slate-300">Most common: ${category}</p>
+						<button type="button" data-drill class="mt-3 w-full rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white">Show exact pins</button>`
+					)
+					.addTo(local);
+				popup.getElement()?.querySelector('[data-drill]')?.addEventListener('click', () => {
+					if (Number.isFinite(bounds.minLng)) interaction.onDrillDown(bounds);
+					popup?.remove();
+				});
+			});
+
 			for (const layer of ['clusters', 'cluster-count']) {
 				local.on('click', layer, (event) => {
-					if (interaction.picking) return;
+					if (interaction.picking || interaction.showZones) return;
 					const clusterId = event.features?.[0]?.properties?.cluster_id;
 					const source = local?.getSource('incidents') as GeoJSONSource | undefined;
 					if (!local || !source || clusterId === undefined) return;
@@ -195,7 +333,7 @@
 			}
 
 			local.on('click', 'unclustered', (event) => {
-				if (interaction.picking) return;
+				if (interaction.picking || interaction.showZones) return;
 				const id = event.features?.[0]?.properties?.id;
 				if (id) onSelect(String(id));
 			});
@@ -205,7 +343,7 @@
 				interaction.onPick(event.lngLat.lng, event.lngLat.lat);
 			});
 
-			for (const layer of ['clusters', 'cluster-count', 'unclustered']) {
+			for (const layer of ['zones-fill', 'clusters', 'cluster-count', 'unclustered']) {
 				local.on('mouseenter', layer, () => {
 					local!.getCanvas().style.cursor = 'pointer';
 				});
@@ -218,6 +356,7 @@
 		return () => {
 			disposed = true;
 			ready = false;
+			popup?.remove();
 			local?.remove();
 			map = undefined;
 		};
@@ -252,6 +391,31 @@
 	$effect(() => {
 		void incidents;
 		if (ready) paint();
+	});
+
+	$effect(() => {
+		const km = cellKm;
+		const rows = incidents;
+		if (!map || !ready) return;
+		const source = map.getSource('zones') as GeoJSONSource | undefined;
+		source?.setData(squareGrid(rows, km));
+	});
+
+	$effect(() => {
+		const zones = showZones;
+		interaction.showZones = zones;
+		interaction.cellKm = cellKm;
+		interaction.onDrillDown = onDrillDown ?? (() => {});
+		if (!map || !ready) return;
+		const zoneVisibility = zones ? 'visible' : 'none';
+		const pinVisibility = zones ? 'none' : 'visible';
+		for (const id of ['zones-fill', 'zones-line']) {
+			if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', zoneVisibility);
+		}
+		for (const id of ['clusters', 'cluster-count', 'unclustered']) {
+			if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', pinVisibility);
+		}
+		if (!zones) popup?.remove();
 	});
 
 	$effect(() => {

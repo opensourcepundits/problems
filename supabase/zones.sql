@@ -1,4 +1,4 @@
-﻿-- Run this whole script once in the Supabase SQL Editor.
+-- Run this whole script once in the Supabase SQL Editor.
 -- Replaces the map functions, lets a vote be cleared, and adds resolved.
 
 create or replace function public.cast_vote(
@@ -137,9 +137,10 @@ $$;
 revoke all on function public.get_incidents(int, text[], double precision, double precision, double precision, double precision) from public;
 grant execute on function public.get_incidents(int, text[], double precision, double precision, double precision, double precision) to anon, authenticated;
 
--- Hexagons covering the main island of Mauritius. cell_km is the distance
--- between parallel sides, from 1 to 10. Empty cells are included so the island
--- stays covered when nothing has been reported. Debunked reports are excluded.
+-- Squares covering the main island of Mauritius, including the coast.
+-- cell_km is the side length, from 1 to 10. Empty cells stay in the result.
+-- Debunked reports are excluded.
+
 drop function if exists public.get_5km_grid(int, text);
 drop function if exists public.get_zone_grid(int, text[], int);
 
@@ -157,15 +158,15 @@ as $$
 declare
   result jsonb;
   v_km int := least(greatest(coalesce(cell_km, 5), 1), 10);
-  v_edge double precision := (v_km * 1000.0) / sqrt(3.0);
+  v_size double precision := v_km * 1000.0;
   v_bounds geometry := ST_Expand(
-    ST_Transform(ST_MakeEnvelope(57.307, -20.525, 57.805, -19.948, 4326), 3857),
-    1500
+    ST_Transform(ST_MakeEnvelope(57.29, -20.55, 57.83, -19.94, 4326), 3857),
+    v_size
   );
 begin
   with cells as (
     select g.geom as cell, g.i as cell_i, g.j as cell_j
-    from ST_HexagonGrid(v_edge, v_bounds) as g
+    from ST_SquareGrid(v_size, v_bounds) as g
   ),
   pts as (
     select

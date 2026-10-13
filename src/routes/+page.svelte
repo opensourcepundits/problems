@@ -3,7 +3,6 @@
 	import { Grid3x3, MapPin, Plus } from 'lucide-svelte';
 	import { onMount } from 'svelte';
 	import IncidentCard from '$lib/components/IncidentCard.svelte';
-	import MapGridHeatmap from '$lib/components/MapGridHeatmap.svelte';
 	import MapPinView from '$lib/components/MapPinView.svelte';
 	import ReportModal from '$lib/components/ReportModal.svelte';
 	import { fetchIncidents } from '$lib/api';
@@ -130,25 +129,24 @@
 />
 
 <div class="absolute inset-0">
-	{#if mode === 'pins'}
-		<MapPinView
-			{incidents}
-			{viewport}
-			{focusNonce}
-			{focusBounds}
-			picking={pickingPin}
-			{draftPin}
-			onViewport={(next) => (viewport = next)}
-			onSelect={(id) => (selectedId = id)}
-			onPick={(lng, lat) => {
-				draftPin = { lng, lat };
-				pickingPin = false;
-				viewport = { center: [lng, lat], zoom: Math.max(viewport.zoom, 14) };
-			}}
-		/>
-	{:else}
-		<MapGridHeatmap {hours} {categories} {cellKm} {viewport} onViewport={(next) => (viewport = next)} onDrillDown={drillDown} />
-	{/if}
+	<MapPinView
+		{incidents}
+		{viewport}
+		{focusNonce}
+		{focusBounds}
+		picking={pickingPin}
+		{draftPin}
+		showZones={mode === 'grid'}
+		{cellKm}
+		onViewport={(next) => (viewport = next)}
+		onSelect={(id) => (selectedId = id)}
+		onDrillDown={drillDown}
+		onPick={(lng, lat) => {
+			draftPin = { lng, lat };
+			pickingPin = false;
+			viewport = { center: [lng, lat], zoom: Math.max(viewport.zoom, 14) };
+		}}
+	/>
 </div>
 
 <div class="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col gap-2 p-3 pr-16">
@@ -247,14 +245,10 @@
 			/>
 		</label>
 		<p class="mt-2 mb-1">Reports in each square</p>
-		<div class="flex items-center gap-1">
-			<span class="h-2 flex-1 rounded bg-white"></span>
-			<span class="h-2 flex-1 rounded bg-amber-200"></span>
-			<span class="h-2 flex-1 rounded bg-yellow-400"></span>
-			<span class="h-2 flex-1 rounded bg-orange-500"></span>
-			<span class="h-2 flex-1 rounded bg-red-600"></span>
-			<span class="h-2 flex-1 rounded bg-purple-700"></span>
-		</div>
+		<div
+			class="h-2 rounded"
+			style="background: linear-gradient(90deg, #f1f5f9, #fde047, #f59e0b, #f97316, #dc2626, #7e22ce)"
+		></div>
 		<p class="mt-1 flex justify-between text-[10px] text-slate-400"><span>None</span><span>Many</span></p>
 	</div>
 {/if}
