@@ -72,7 +72,7 @@ export type GridFeatureCollection = {
 		properties: {
 			total_count: number;
 			critical_count: number;
-			top_category: string;
+			top_category: string | null;
 		};
 	}>;
 };

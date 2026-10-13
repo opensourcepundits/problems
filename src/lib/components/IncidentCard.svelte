@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { ThumbsDown, ThumbsUp, X } from 'lucide-svelte';
-	import { addComment, fetchComments, vote } from '$lib/api';
+	import { addComment, fetchComments, fetchMyVote, vote } from '$lib/api';
 	import { createSupabaseBrowserClient } from '$lib/supabaseClient';
 	import { CATEGORY_LABEL, type Incident, type IncidentComment, type VoteType } from '$lib/types';
 	import { pushToast } from '$lib/ui.svelte';
@@ -16,6 +16,7 @@
 	} = $props();
 
 	let comments = $state<IncidentComment[]>([]);
+	let myVote = $state<VoteType | null>(null);
 	let draft = $state('');
 	let busy = $state(false);
 	let mediaIndex = $state(0);
@@ -29,8 +30,10 @@
 		if (syncedId !== incidentId) {
 			syncedId = incidentId;
 			mediaIndex = 0;
+			myVote = null;
 		}
 		void loadComments(incidentId, incident.comment_count);
+		void loadVote(incidentId);
 	});
 
 	function isVideo(url: string) {
@@ -52,12 +55,25 @@
 		}
 	}
 
+	async function loadVote(incidentId: string) {
+		const supabase = createSupabaseBrowserClient();
+		if (!supabase) return;
+		try {
+			const voteType = await fetchMyVote(supabase, incidentId);
+			if (incident.id === incidentId) myVote = voteType;
+		} catch (cause) {
+			pushToast(cause instanceof Error ? cause.message : 'Could not load your vote.', 'err');
+		}
+	}
+
 	async function castVote(voteType: VoteType) {
 		const supabase = createSupabaseBrowserClient();
 		if (!supabase) return;
+		const next = myVote === voteType ? null : voteType;
 		busy = true;
 		try {
-			await vote(supabase, incident.id, voteType);
+			await vote(supabase, incident.id, next);
+			myVote = next;
 			onChanged();
 		} catch (cause) {
 			pushToast(cause instanceof Error ? cause.message : 'Could not save the vote.', 'err');
@@ -129,14 +145,39 @@
 			<p class="mb-4 text-sm text-slate-400">{incident.address_hint}</p>
 		{/if}
 
-		<div class="mb-4 flex gap-2">
-			<button type="button" class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-800 py-2 text-sm" disabled={busy} onclick={() => castVote('confirm')}>
-				<ThumbsUp size={16} /> Confirm {incident.confirm_count}
+		<div class="mb-2 grid grid-cols-2 gap-2" role="group" aria-label="Confirm or deny this report">
+			<button
+				type="button"
+				class="flex flex-col items-center gap-1 rounded-2xl border-2 px-3 py-3 text-sm font-semibold {myVote === 'confirm' ? 'border-emerald-200 bg-emerald-500 text-white shadow-lg' : 'border-slate-600 bg-slate-950 text-slate-300'}"
+				aria-pressed={myVote === 'confirm'}
+				disabled={busy}
+				onclick={() => castVote('confirm')}
+			>
+				<ThumbsUp size={22} />
+				Confirm
+				<span class="text-xs font-normal">{incident.confirm_count}</span>
 			</button>
-			<button type="button" class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-800 py-2 text-sm" disabled={busy} onclick={() => castVote('deny')}>
-				<ThumbsDown size={16} /> Deny {incident.deny_count}
+			<button
+				type="button"
+				class="flex flex-col items-center gap-1 rounded-2xl border-2 px-3 py-3 text-sm font-semibold {myVote === 'deny' ? 'border-red-200 bg-red-600 text-white shadow-lg' : 'border-slate-600 bg-slate-950 text-slate-300'}"
+				aria-pressed={myVote === 'deny'}
+				disabled={busy}
+				onclick={() => castVote('deny')}
+			>
+				<ThumbsDown size={22} />
+				Deny
+				<span class="text-xs font-normal">{incident.deny_count}</span>
 			</button>
 		</div>
+		<p class="mb-4 text-xs text-slate-400">
+			{#if myVote === 'confirm'}
+				You confirmed this report. Tap Confirm again to clear it.
+			{:else if myVote === 'deny'}
+				You denied this report. Tap Deny again to clear it.
+			{:else}
+				Choose one. Confirm and deny cannot both be on.
+			{/if}
+		</p>
 
 		<h3 class="mb-2 text-sm font-semibold text-slate-300">Comments</h3>
 		<ul class="mb-3 space-y-2">

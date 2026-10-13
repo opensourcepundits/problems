@@ -22,7 +22,8 @@
 
 	let mode = $state<'pins' | 'grid'>('pins');
 	let hours = $state(24);
-	let category = $state<Category | 'all'>('all');
+	let categories = $state<Category[]>([]);
+	let cellKm = $state(5);
 	let viewport = $state<Viewport>({ center: HOME_VIEWPORT.center, zoom: HOME_VIEWPORT.zoom });
 	let bounds = $state<TileBounds | null>(null);
 	let focusNonce = $state(0);
@@ -48,7 +49,7 @@
 		loading = true;
 		error = '';
 		try {
-			incidents = await fetchIncidents(supabase, hours, category, mode === 'pins' ? bounds : null);
+			incidents = await fetchIncidents(supabase, hours, categories, mode === 'pins' ? bounds : null);
 			if (selectedId && !incidents.some((incident) => incident.id === selectedId)) selectedId = null;
 		} catch (cause) {
 			error = cause instanceof Error ? cause.message : 'Could not load incidents.';
@@ -86,7 +87,7 @@
 
 	$effect(() => {
 		void hours;
-		void category;
+		void categories;
 		void bounds;
 		void mode;
 		if (browser) void load();
@@ -96,7 +97,7 @@
 		if (!browser || mapCommand.nonce === 0 || mapCommand.nonce === seenCommand) return;
 		seenCommand = mapCommand.nonce;
 		mode = 'pins';
-		category = 'all';
+		categories = [];
 		bounds = null;
 		viewport = { center: [mapCommand.lng, mapCommand.lat], zoom: 15 };
 		selectedId = mapCommand.incidentId;
@@ -146,7 +147,7 @@
 			}}
 		/>
 	{:else}
-		<MapGridHeatmap {hours} {category} {viewport} onViewport={(next) => (viewport = next)} onDrillDown={drillDown} />
+		<MapGridHeatmap {hours} {categories} {cellKm} {viewport} onViewport={(next) => (viewport = next)} onDrillDown={drillDown} />
 	{/if}
 </div>
 
@@ -167,7 +168,7 @@
 				aria-pressed={mode === 'grid'}
 				onclick={() => (mode = 'grid')}
 			>
-				<Grid3x3 size={14} /> 5km zones
+				<Grid3x3 size={14} /> {cellKm} km zones
 			</button>
 		</div>
 		<div class="flex rounded-full bg-slate-950/90 p-1 text-sm shadow-lg">
@@ -192,16 +193,22 @@
 	<div class="pointer-events-auto flex gap-2 overflow-x-auto pb-1">
 		<button
 			type="button"
-			class="shrink-0 rounded-full px-3 py-1 text-sm {category === 'all' ? 'bg-white text-slate-950' : 'bg-slate-950/85 text-slate-200'}"
-			onclick={() => (category = 'all')}
+			class="shrink-0 rounded-full px-3 py-1 text-sm {categories.length === 0 ? 'bg-white text-slate-950' : 'bg-slate-950/85 text-slate-200'}"
+			aria-pressed={categories.length === 0}
+			onclick={() => (categories = [])}
 		>
 			All
 		</button>
 		{#each CATEGORIES as item (item)}
 			<button
 				type="button"
-				class="shrink-0 rounded-full px-3 py-1 text-sm {category === item ? 'bg-white text-slate-950' : 'bg-slate-950/85 text-slate-200'}"
-				onclick={() => (category = item)}
+				class="shrink-0 rounded-full px-3 py-1 text-sm {categories.includes(item) ? 'bg-white text-slate-950' : 'bg-slate-950/85 text-slate-200'}"
+				aria-pressed={categories.includes(item)}
+				onclick={() => {
+					categories = categories.includes(item)
+						? categories.filter((value) => value !== item)
+						: [...categories, item];
+				}}
 			>
 				{CATEGORY_LABEL[item]}
 			</button>
@@ -217,7 +224,7 @@
 				focusBounds = null;
 			}}
 		>
-			Showing one 5km square · Clear
+			Showing one zone · Clear
 		</button>
 	{/if}
 	{#if error}
@@ -226,14 +233,29 @@
 </div>
 
 {#if mode === 'grid'}
-	<div class="pointer-events-none absolute bottom-6 left-3 z-10 rounded-2xl bg-slate-950/85 px-3 py-2 text-xs text-slate-200 shadow-lg">
-		<p class="mb-1 font-medium">Incidents per 5km square</p>
-		<div class="flex items-center gap-2">
-			<span class="h-2 w-6 rounded bg-yellow-400"></span>
-			<span class="h-2 w-6 rounded bg-orange-500"></span>
-			<span class="h-2 w-6 rounded bg-red-600"></span>
-			<span class="h-2 w-6 rounded bg-purple-700"></span>
+	<div class="pointer-events-auto absolute bottom-6 left-3 z-10 w-56 rounded-2xl bg-slate-950/90 px-3 py-3 text-xs text-slate-200 shadow-lg">
+		<label class="block font-medium">
+			Hexagon size · {cellKm} km
+			<input
+				class="mt-2 w-full accent-red-500"
+				type="range"
+				min="1"
+				max="10"
+				step="1"
+				value={cellKm}
+				oninput={(event) => (cellKm = Number(event.currentTarget.value))}
+			/>
+		</label>
+		<p class="mt-2 mb-1">Reports in each hexagon</p>
+		<div class="flex items-center gap-1">
+			<span class="h-2 flex-1 rounded bg-white"></span>
+			<span class="h-2 flex-1 rounded bg-amber-200"></span>
+			<span class="h-2 flex-1 rounded bg-yellow-400"></span>
+			<span class="h-2 flex-1 rounded bg-orange-500"></span>
+			<span class="h-2 flex-1 rounded bg-red-600"></span>
+			<span class="h-2 flex-1 rounded bg-purple-700"></span>
 		</div>
+		<p class="mt-1 flex justify-between text-[10px] text-slate-400"><span>None</span><span>Many</span></p>
 	</div>
 {/if}
 

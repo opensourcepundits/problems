@@ -48,13 +48,13 @@ function asIncident(row: Database['public']['Functions']['get_incidents']['Retur
 export async function fetchIncidents(
 	supabase: Client,
 	hours: number,
-	category: Category | 'all',
+	categories: Category[],
 	bounds: TileBounds | null
 ): Promise<Incident[]> {
 	const filters: Database['public']['Functions']['get_incidents']['Args'] = {
 		hours_back: hours
 	};
-	if (category !== 'all') filters.category_filter = category;
+	if (categories.length > 0) filters.categories = categories;
 	if (bounds) {
 		filters.min_lng = bounds.minLng;
 		filters.min_lat = bounds.minLat;
@@ -69,14 +69,16 @@ export async function fetchIncidents(
 export async function fetchGrid(
 	supabase: Client,
 	hours: number,
-	category: Category | 'all'
+	categories: Category[],
+	cellKm: number
 ): Promise<GridFeatureCollection> {
-	const filters: Database['public']['Functions']['get_5km_grid']['Args'] = {
-		hours_back: hours
+	const filters: Database['public']['Functions']['get_zone_grid']['Args'] = {
+		hours_back: hours,
+		cell_km: cellKm
 	};
-	if (category !== 'all') filters.category_filter = category;
-	const { data, error } = await supabase.rpc('get_5km_grid', filters);
-	if (error) throw new Error(message(error, 'Could not load the 5km grid.'));
+	if (categories.length > 0) filters.categories = categories;
+	const { data, error } = await supabase.rpc('get_zone_grid', filters);
+	if (error) throw new Error(message(error, 'Could not load the zones.'));
 	const collection = data as GridFeatureCollection | null;
 	if (!collection || collection.type !== 'FeatureCollection' || !Array.isArray(collection.features)) {
 		return { type: 'FeatureCollection', features: [] };
@@ -187,11 +189,23 @@ export async function deleteComment(supabase: Client, commentId: string) {
 	if (error) throw new Error(message(error, 'Could not delete the comment.'));
 }
 
-export async function vote(supabase: Client, incidentId: string, voteType: VoteType) {
+export async function fetchMyVote(supabase: Client, incidentId: string): Promise<VoteType | null> {
+	const { data, error } = await supabase
+		.from('incident_confirmations')
+		.select('vote_type')
+		.eq('incident_id', incidentId)
+		.eq('voter_key', voterKey())
+		.maybeSingle();
+	if (error) throw new Error(message(error, 'Could not load your vote.'));
+	if (data?.vote_type === 'confirm' || data?.vote_type === 'deny') return data.vote_type;
+	return null;
+}
+
+export async function vote(supabase: Client, incidentId: string, voteType: VoteType | null) {
 	const { error } = await supabase.rpc('cast_vote', {
 		p_incident_id: incidentId,
 		p_voter_key: voterKey(),
-		p_vote_type: voteType
+		p_vote_type: voteType ?? ''
 	});
 	if (error) throw new Error(message(error, 'Could not save the vote.'));
 }

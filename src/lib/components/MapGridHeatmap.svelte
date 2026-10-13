@@ -6,17 +6,19 @@
 	import { createSupabaseBrowserClient } from '$lib/supabaseClient';
 	import { CATEGORY_LABEL, isCategory, type Category, type TileBounds, type Viewport } from '$lib/types';
 	import type { FeatureCollection, Polygon } from 'geojson';
-	import type { GeoJSONSource, Map, Popup } from 'maplibre-gl';
+	import type { ExpressionSpecification, GeoJSONSource, Map, Popup } from 'maplibre-gl';
 
 	let {
 		hours,
-		category,
+		categories,
+		cellKm,
 		viewport,
 		onViewport,
 		onDrillDown
 	}: {
 		hours: number;
-		category: Category | 'all';
+		categories: Category[];
+		cellKm: number;
 		viewport: Viewport;
 		onViewport: (viewport: Viewport) => void;
 		onDrillDown: (bounds: TileBounds) => void;
@@ -28,9 +30,35 @@
 	let applying = false;
 	let loading = $state(false);
 	let error = $state('');
-	let empty = $state(false);
 	let popup: Popup | undefined;
 	let requestId = 0;
+	const view = { km: 5 };
+
+	function heatColor(km: number): ExpressionSpecification {
+		const step = Math.max(1, km);
+		return [
+			'interpolate',
+			['linear'],
+			['get', 'total_count'],
+			0,
+			'#ffffff',
+			step,
+			'#fef3c7',
+			step * 2,
+			'#facc15',
+			step * 4,
+			'#f97316',
+			step * 8,
+			'#dc2626',
+			step * 14,
+			'#7e22ce'
+		];
+	}
+
+	function heatOpacity(km: number): ExpressionSpecification {
+		const step = Math.max(1, km);
+		return ['interpolate', ['linear'], ['get', 'total_count'], 0, 0.45, step, 0.62, step * 8, 0.84];
+	}
 
 	function tileBounds(geometry: Polygon): TileBounds | null {
 		const ring = geometry.coordinates[0];
@@ -75,9 +103,8 @@
 		loading = true;
 		error = '';
 		try {
-			const collection = await fetchGrid(supabase, hours, category);
+			const collection = await fetchGrid(supabase, hours, categories, cellKm);
 			if (current !== requestId) return;
-			empty = collection.features.length === 0;
 			const source = map?.getSource('grid') as GeoJSONSource | undefined;
 			source?.setData(collection as FeatureCollection<Polygon>);
 		} catch (cause) {
@@ -123,27 +150,15 @@
 					type: 'fill',
 					source: 'grid',
 					paint: {
-						'fill-color': [
-							'interpolate',
-							['linear'],
-							['get', 'total_count'],
-							1,
-							'#facc15',
-							4,
-							'#f97316',
-							8,
-							'#dc2626',
-							15,
-							'#7e22ce'
-						],
-						'fill-opacity': 0.62
+						'fill-color': '#ffffff',
+						'fill-opacity': 0.45
 					}
 				});
 				local.addLayer({
 					id: 'grid-line',
 					type: 'line',
 					source: 'grid',
-					paint: { 'line-color': '#0b1220', 'line-width': 1.2 }
+					paint: { 'line-color': '#64748b', 'line-width': 1 }
 				});
 				ready = true;
 			});
@@ -164,14 +179,14 @@
 				const props = feature.properties ?? {};
 				const total = Number(props.total_count ?? 0);
 				const critical = Number(props.critical_count ?? 0);
-				const categoryRaw = String(props.top_category ?? 'other');
-				const category = isCategory(categoryRaw) ? CATEGORY_LABEL[categoryRaw] : escapeHtml(categoryRaw);
+				const categoryRaw = props.top_category == null ? '' : String(props.top_category);
+				const category = isCategory(categoryRaw) ? CATEGORY_LABEL[categoryRaw] : total === 0 ? 'None' : escapeHtml(categoryRaw || 'Other');
 				const bounds = tileBounds(feature.geometry);
 				popup?.remove();
 				popup = new maplibregl.Popup({ className: 'crisis-popup', maxWidth: '260px' })
 					.setLngLat(event.lngLat)
 					.setHTML(
-						`<p class="text-xs uppercase tracking-wide text-slate-400">5km square</p>
+						`<p class="text-xs uppercase tracking-wide text-slate-400">${view.km} km hexagon</p>
 						<p class="mt-1 text-lg font-semibold">${total} events</p>
 						<p class="text-sm text-red-300">${critical} critical</p>
 						<p class="mt-1 text-sm text-slate-300">Most common: ${category}</p>
@@ -202,9 +217,14 @@
 	});
 
 	$effect(() => {
+		view.km = cellKm;
+		const selected = categories.join(',');
 		void hours;
-		void category;
-		if (ready) void loadGrid();
+		void selected;
+		if (!map || !ready) return;
+		map.setPaintProperty('grid-fill', 'fill-color', heatColor(cellKm));
+		map.setPaintProperty('grid-fill', 'fill-opacity', heatOpacity(cellKm));
+		void loadGrid();
 	});
 
 	$effect(() => {
@@ -226,13 +246,9 @@
 </div>
 {#if loading}
 	<p class="pointer-events-none absolute bottom-24 left-3 z-10 rounded-full bg-slate-950/80 px-3 py-1 text-xs text-slate-200">
-		Loading 5km squares…
+		Loading {cellKm} km hexagons…
 	</p>
 {/if}
 {#if error}
 	<p class="absolute bottom-24 left-3 z-10 max-w-sm rounded-xl bg-red-950/90 px-3 py-2 text-sm text-red-100">{error}</p>
-{:else if empty && !loading}
-	<p class="pointer-events-none absolute bottom-24 left-3 z-10 rounded-xl bg-slate-950/80 px-3 py-2 text-sm text-slate-200">
-		No incidents in this time window.
-	</p>
 {/if}

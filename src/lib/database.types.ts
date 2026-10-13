@@ -158,7 +158,7 @@ export type Database = {
 			get_incidents: {
 				Args: {
 					hours_back?: number;
-					category_filter?: string | null;
+					categories?: string[] | null;
 					min_lng?: number | null;
 					min_lat?: number | null;
 					max_lng?: number | null;
@@ -193,10 +193,11 @@ export type Database = {
 				};
 				Returns: undefined;
 			};
-			get_5km_grid: {
+			get_zone_grid: {
 				Args: {
 					hours_back?: number;
-					category_filter?: string | null;
+					categories?: string[] | null;
+					cell_km?: number;
 				};
 				Returns: Json;
 			};
