@@ -25,7 +25,7 @@ export type Database = {
 			incidents: {
 				Row: {
 					id: string;
-					user_id: string;
+					user_id: string | null;
 					title: string;
 					description: string | null;
 					category: Database['public']['Enums']['incident_category'];
@@ -39,7 +39,7 @@ export type Database = {
 				};
 				Insert: {
 					id?: string;
-					user_id: string;
+					user_id?: string | null;
 					title: string;
 					description?: string | null;
 					category: Database['public']['Enums']['incident_category'];
@@ -66,7 +66,7 @@ export type Database = {
 				Row: {
 					id: string;
 					incident_id: string;
-					user_id: string;
+					user_id: string | null;
 					comment: string;
 					media_url: string | null;
 					created_at: string;
@@ -74,7 +74,7 @@ export type Database = {
 				Insert: {
 					id?: string;
 					incident_id: string;
-					user_id: string;
+					user_id?: string | null;
 					comment: string;
 					media_url?: string | null;
 					created_at?: string;
@@ -97,7 +97,8 @@ export type Database = {
 				Row: {
 					id: string;
 					incident_id: string;
-					user_id: string;
+					user_id: string | null;
+					voter_key: string | null;
 					vote_type: Database['public']['Enums']['vote_type'];
 					created_at: string;
 				};
@@ -165,7 +166,7 @@ export type Database = {
 				};
 				Returns: {
 					id: string;
-					user_id: string;
+					user_id: string | null;
 					title: string;
 					description: string | null;
 					category: string;
@@ -183,6 +184,14 @@ export type Database = {
 					comment_count: number;
 					author_name: string | null;
 				}[];
+			};
+			cast_vote: {
+				Args: {
+					p_incident_id: string;
+					p_voter_key: string;
+					p_vote_type: string;
+				};
+				Returns: undefined;
 			};
 			get_5km_grid: {
 				Args: {

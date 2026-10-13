@@ -1,11 +1,8 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { Siren } from 'lucide-svelte';
 	import { createIncident, currentPosition } from '$lib/api';
 	import { createSupabaseBrowserClient } from '$lib/supabaseClient';
 	import { flyToIncident, pushToast } from '$lib/ui.svelte';
-
-	let { userId }: { userId: string | null } = $props();
 
 	const HOLD_MS = 1500;
 	let progress = $state(0);
@@ -52,12 +49,6 @@
 	}
 
 	async function trigger() {
-		if (!userId) {
-			progress = 0;
-			pushToast('Sign in before sending an SOS.', 'err');
-			await goto('/auth/login?next=/');
-			return;
-		}
 		const supabase = createSupabaseBrowserClient();
 		if (!supabase) {
 			progress = 0;

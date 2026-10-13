@@ -1,11 +1,10 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { Download, LogOut, Siren } from 'lucide-svelte';
+	import { Download, Siren } from 'lucide-svelte';
 	import { onMount } from 'svelte';
 	import EmergencySosButton from '$lib/components/EmergencySosButton.svelte';
-	import { createSupabaseBrowserClient, supabaseConfigProblem } from '$lib/supabaseClient';
-	import { pushToast, toaster } from '$lib/ui.svelte';
+	import { supabaseConfigProblem } from '$lib/supabaseClient';
+	import { toaster } from '$lib/ui.svelte';
 	import '../app.css';
 
 	interface BeforeInstallPromptEvent extends Event {
@@ -13,7 +12,7 @@
 		userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 	}
 
-	let { data, children } = $props();
+	let { children } = $props();
 
 	let showInstall = $state(false);
 	let iosHint = $state(false);
@@ -22,19 +21,6 @@
 	const onMap = $derived(page.url.pathname === '/');
 
 	onMount(() => {
-		const params = new URLSearchParams(window.location.search);
-		const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-		const authError = params.get('error_description') || hash.get('error_description');
-		if (authError) {
-			pushToast(decodeURIComponent(authError.replace(/\+/g, ' ')), 'err');
-			const clean = new URL(window.location.href);
-			clean.searchParams.delete('error');
-			clean.searchParams.delete('error_code');
-			clean.searchParams.delete('error_description');
-			clean.hash = '';
-			history.replaceState({}, '', `${clean.pathname}${clean.search}`);
-		}
-
 		const standalone = window.matchMedia('(display-mode: standalone)').matches;
 		const dismissed = sessionStorage.getItem('install-dismissed') === '1';
 		const ios = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
@@ -68,13 +54,6 @@
 		sessionStorage.setItem('install-dismissed', '1');
 		showInstall = false;
 	}
-
-	async function signOut() {
-		const supabase = createSupabaseBrowserClient();
-		if (!supabase) return;
-		await supabase.auth.signOut();
-		await goto('/auth/login');
-	}
 </script>
 
 <svelte:head>
@@ -87,17 +66,6 @@
 			<span class="grid h-8 w-8 place-items-center rounded-lg bg-red-600 text-white"><Siren size={16} /></span>
 			Crisis Report
 		</a>
-		<div class="flex items-center gap-2 text-sm">
-			{#if data.user}
-				<span class="hidden max-w-40 truncate text-slate-400 sm:block">{data.user.email}</span>
-				<button type="button" class="inline-flex items-center gap-1 rounded-full px-2 py-1 text-slate-300 hover:bg-slate-800" onclick={signOut}>
-					<LogOut size={16} /> Sign out
-				</button>
-			{:else}
-				<a class="rounded-full px-3 py-1 text-slate-300 hover:bg-slate-800" href="/auth/login">Sign in</a>
-				<a class="rounded-full bg-white px-3 py-1 font-medium text-slate-950" href="/auth/signup">Create account</a>
-			{/if}
-		</div>
 	</header>
 
 	{#if configProblem}
@@ -130,7 +98,7 @@
 </div>
 
 {#if onMap}
-	<EmergencySosButton userId={data.user?.id ?? null} />
+	<EmergencySosButton />
 {/if}
 
 <div class="pointer-events-none fixed top-20 right-3 z-[70] flex w-[min(100%-1.5rem,22rem)] flex-col gap-2">

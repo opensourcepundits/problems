@@ -55,7 +55,7 @@ create table if not exists public.profiles (
 
 create table if not exists public.incidents (
   id uuid primary key default uuid_generate_v4(),
-  user_id uuid not null references public.profiles (id) on delete restrict,
+  user_id uuid references public.profiles (id) on delete restrict,
   title text not null,
   description text,
   category public.incident_category not null,
@@ -78,7 +78,7 @@ create table if not exists public.incidents (
 create table if not exists public.incident_comments (
   id uuid primary key default uuid_generate_v4(),
   incident_id uuid not null references public.incidents (id) on delete cascade,
-  user_id uuid not null references public.profiles (id) on delete restrict,
+  user_id uuid references public.profiles (id) on delete restrict,
   comment text not null,
   media_url text,
   created_at timestamptz not null default now(),
@@ -88,11 +88,19 @@ create table if not exists public.incident_comments (
 create table if not exists public.incident_confirmations (
   id uuid primary key default uuid_generate_v4(),
   incident_id uuid not null references public.incidents (id) on delete cascade,
-  user_id uuid not null references public.profiles (id) on delete restrict,
+  user_id uuid references public.profiles (id) on delete restrict,
+  voter_key text,
   vote_type public.vote_type not null,
-  created_at timestamptz not null default now(),
-  constraint incident_confirmations_one_vote unique (incident_id, user_id)
+  created_at timestamptz not null default now()
 );
+
+alter table public.incidents alter column user_id drop not null;
+alter table public.incident_comments alter column user_id drop not null;
+alter table public.incident_confirmations alter column user_id drop not null;
+alter table public.incident_confirmations add column if not exists voter_key text;
+alter table public.incident_confirmations drop constraint if exists incident_confirmations_one_vote;
+create unique index if not exists incident_confirmations_one_voter
+  on public.incident_confirmations (incident_id, voter_key);
 
 -- Append-only audit trail. created_at is stamped by trigger and cannot be updated.
 create table if not exists public.action_logs (
@@ -180,6 +188,11 @@ begin
     if auth.uid() is not null then
       new.user_id := auth.uid();
     end if;
+    if new.user_id is not null then
+      insert into public.profiles (id)
+      values (new.user_id)
+      on conflict (id) do nothing;
+    end if;
     new.created_at := now();
     new.updated_at := now();
     if new.is_sos then
@@ -211,6 +224,11 @@ as $$
 begin
   if auth.uid() is not null then
     new.user_id := auth.uid();
+  end if;
+  if new.user_id is not null then
+    insert into public.profiles (id)
+    values (new.user_id)
+    on conflict (id) do nothing;
   end if;
   new.created_at := now();
   return new;
@@ -246,27 +264,27 @@ begin
 end;
 $$;
 
-create or replace function public.incident_audit_payload(row public.incidents)
+create or replace function public.incident_audit_payload(rec public.incidents)
 returns jsonb
 language sql
 stable
 set search_path = public, extensions
 as $$
   select jsonb_build_object(
-    'id', row.id,
-    'user_id', row.user_id,
-    'title', row.title,
-    'description', row.description,
-    'category', row.category,
-    'severity', row.severity,
-    'status', row.status,
-    'is_sos', row.is_sos,
-    'address_hint', row.address_hint,
-    'media_urls', to_jsonb(row.media_urls),
-    'lat', ST_Y(row.location),
-    'lng', ST_X(row.location),
-    'created_at', row.created_at,
-    'updated_at', row.updated_at
+    'id', rec.id,
+    'user_id', rec.user_id,
+    'title', rec.title,
+    'description', rec.description,
+    'category', rec.category,
+    'severity', rec.severity,
+    'status', rec.status,
+    'is_sos', rec.is_sos,
+    'address_hint', rec.address_hint,
+    'media_urls', to_jsonb(rec.media_urls),
+    'lat', ST_Y(rec.location),
+    'lng', ST_X(rec.location),
+    'created_at', rec.created_at,
+    'updated_at', rec.updated_at
   );
 $$;
 
@@ -471,9 +489,6 @@ declare
   v_category public.incident_category;
   v_severity public.incident_severity;
 begin
-  if auth.uid() is null then
-    raise exception 'not authenticated' using errcode = '28000';
-  end if;
   if p_lat is null or p_lng is null or p_lat < -90 or p_lat > 90 or p_lng < -180 or p_lng > 180 then
     raise exception 'invalid coordinates' using errcode = '22023';
   end if;
@@ -519,7 +534,38 @@ end;
 $$;
 
 revoke all on function public.create_incident(text, text, text, text, double precision, double precision, text, text[], boolean) from public;
-grant execute on function public.create_incident(text, text, text, text, double precision, double precision, text, text[], boolean) to authenticated;
+grant execute on function public.create_incident(text, text, text, text, double precision, double precision, text, text[], boolean) to anon, authenticated;
+
+create or replace function public.cast_vote(
+  p_incident_id uuid,
+  p_voter_key text,
+  p_vote_type text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+begin
+  if p_voter_key is null or char_length(p_voter_key) < 8 or char_length(p_voter_key) > 80 then
+    raise exception 'invalid voter key' using errcode = '22023';
+  end if;
+  if p_vote_type not in ('confirm', 'deny') then
+    raise exception 'invalid vote' using errcode = '22023';
+  end if;
+  if not exists (select 1 from public.incidents where id = p_incident_id) then
+    raise exception 'incident not found' using errcode = 'P0002';
+  end if;
+
+  insert into public.incident_confirmations (incident_id, user_id, voter_key, vote_type)
+  values (p_incident_id, auth.uid(), p_voter_key, p_vote_type::public.vote_type)
+  on conflict (incident_id, voter_key) do update
+  set vote_type = excluded.vote_type;
+end;
+$$;
+
+revoke all on function public.cast_vote(uuid, text, text) from public;
+grant execute on function public.cast_vote(uuid, text, text) to anon, authenticated;
 
 create or replace function public.get_incidents(
   hours_back int default 168,
@@ -703,8 +749,8 @@ create policy incidents_select_public on public.incidents
 
 drop policy if exists incidents_insert_own on public.incidents;
 create policy incidents_insert_own on public.incidents
-  for insert to authenticated
-  with check (user_id = auth.uid());
+  for insert to anon, authenticated
+  with check (user_id is not distinct from auth.uid());
 
 drop policy if exists incidents_update_own on public.incidents;
 create policy incidents_update_own on public.incidents
@@ -719,8 +765,8 @@ create policy comments_select_public on public.incident_comments
 
 drop policy if exists comments_insert_own on public.incident_comments;
 create policy comments_insert_own on public.incident_comments
-  for insert to authenticated
-  with check (user_id = auth.uid());
+  for insert to anon, authenticated
+  with check (user_id is not distinct from auth.uid());
 
 drop policy if exists comments_delete_own on public.incident_comments;
 create policy comments_delete_own on public.incident_comments
@@ -765,8 +811,8 @@ revoke update, delete, truncate on public.action_logs from public, anon, authent
 grant usage on schema public to anon, authenticated;
 grant select on public.profiles, public.incidents, public.incident_comments, public.incident_confirmations to anon, authenticated;
 grant insert, update on public.profiles to authenticated;
-grant insert, update on public.incidents to authenticated;
-grant insert, delete on public.incident_comments to authenticated;
+grant insert, update on public.incidents to anon, authenticated;
+grant insert, delete on public.incident_comments to anon, authenticated;
 grant insert, update, delete on public.incident_confirmations to authenticated;
 grant select, insert on public.action_logs to authenticated;
 
@@ -794,11 +840,12 @@ create policy incident_media_public_read on storage.objects
   using (bucket_id = 'incident-media');
 
 drop policy if exists incident_media_authenticated_insert on storage.objects;
-create policy incident_media_authenticated_insert on storage.objects
-  for insert to authenticated
+drop policy if exists incident_media_public_insert on storage.objects;
+create policy incident_media_public_insert on storage.objects
+  for insert to anon, authenticated
   with check (
     bucket_id = 'incident-media'
-    and (storage.foldername(name))[1] = auth.uid()::text
+    and (storage.foldername(name))[1] = 'public'
   );
 
 drop policy if exists incident_media_owner_delete on storage.objects;

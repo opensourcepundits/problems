@@ -11,15 +11,21 @@
 		viewport,
 		focusNonce = 0,
 		focusBounds = null,
+		picking = false,
+		draftPin = null,
 		onViewport,
-		onSelect
+		onSelect,
+		onPick
 	}: {
 		incidents: Incident[];
 		viewport: Viewport;
 		focusNonce?: number;
 		focusBounds?: [[number, number], [number, number]] | null;
+		picking?: boolean;
+		draftPin?: { lng: number; lat: number } | null;
 		onViewport: (viewport: Viewport) => void;
 		onSelect: (id: string) => void;
+		onPick?: (lng: number, lat: number) => void;
 	} = $props();
 
 	let container = $state<HTMLDivElement | undefined>(undefined);
@@ -27,6 +33,10 @@
 	let ready = $state(false);
 	let applying = false;
 	let seenFocus = 0;
+	const interaction = {
+		picking: false,
+		onPick: (_lng: number, _lat: number) => {}
+	};
 
 	function collection(): FeatureCollection<Point> {
 		return {
@@ -120,6 +130,21 @@
 						'circle-opacity': ['match', ['get', 'status'], 'resolved', 0.45, 0.95]
 					}
 				});
+				local.addSource('draft', {
+					type: 'geojson',
+					data: { type: 'FeatureCollection', features: [] }
+				});
+				local.addLayer({
+					id: 'draft-pin',
+					type: 'circle',
+					source: 'draft',
+					paint: {
+						'circle-radius': 9,
+						'circle-color': '#facc15',
+						'circle-stroke-width': 3,
+						'circle-stroke-color': '#0f172a'
+					}
+				});
 				ready = true;
 				if (focusBounds && focusNonce !== seenFocus) {
 					seenFocus = focusNonce;
@@ -138,6 +163,7 @@
 			});
 
 			local.on('click', 'clusters', (event) => {
+				if (interaction.picking) return;
 				const clusterId = event.features?.[0]?.properties?.cluster_id;
 				const source = local?.getSource('incidents') as GeoJSONSource | undefined;
 				if (!local || !source || clusterId === undefined) return;
@@ -147,8 +173,14 @@
 			});
 
 			local.on('click', 'unclustered', (event) => {
+				if (interaction.picking) return;
 				const id = event.features?.[0]?.properties?.id;
 				if (id) onSelect(String(id));
+			});
+
+			local.on('click', (event) => {
+				if (!interaction.picking) return;
+				interaction.onPick(event.lngLat.lng, event.lngLat.lat);
 			});
 
 			for (const layer of ['clusters', 'unclustered']) {
@@ -167,6 +199,32 @@
 			local?.remove();
 			map = undefined;
 		};
+	});
+
+	$effect(() => {
+		interaction.picking = picking;
+		interaction.onPick = onPick ?? (() => {});
+		if (map && ready) map.getCanvas().style.cursor = picking ? 'crosshair' : '';
+	});
+
+	$effect(() => {
+		const point = draftPin;
+		if (!map || !ready) return;
+		const source = map.getSource('draft') as GeoJSONSource | undefined;
+		source?.setData(
+			point
+				? {
+						type: 'FeatureCollection',
+						features: [
+							{
+								type: 'Feature',
+								geometry: { type: 'Point', coordinates: [point.lng, point.lat] },
+								properties: {}
+							}
+						]
+					}
+				: { type: 'FeatureCollection', features: [] }
+		);
 	});
 
 	$effect(() => {

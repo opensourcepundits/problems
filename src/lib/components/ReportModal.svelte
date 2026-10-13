@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ImagePlus, LocateFixed, X } from 'lucide-svelte';
+	import { ImagePlus, LocateFixed, MapPin, X } from 'lucide-svelte';
 	import { onDestroy } from 'svelte';
 	import { createIncident, currentPosition, uploadEvidence } from '$lib/api';
 	import { prepareMedia } from '$lib/media';
@@ -8,13 +8,21 @@
 	import { pushToast } from '$lib/ui.svelte';
 
 	let {
-		userId,
+		picking,
+		lat,
+		lng,
 		onClose,
-		onCreated
+		onCreated,
+		onDropPin,
+		onUseGps
 	}: {
-		userId: string;
+		picking: boolean;
+		lat: number | null;
+		lng: number | null;
 		onClose: () => void;
 		onCreated: (id: string, lng: number, lat: number) => void;
+		onDropPin: () => void;
+		onUseGps: (lat: number, lng: number) => void;
 	} = $props();
 
 	let title = $state('');
@@ -22,8 +30,6 @@
 	let category = $state<Category>('fire');
 	let severity = $state<Severity>('medium');
 	let addressHint = $state('');
-	let lat = $state<number | null>(null);
-	let lng = $state<number | null>(null);
 	let busy = $state(false);
 	let locating = $state(false);
 	let previews = $state<{ url: string; file: File; video: boolean }[]>([]);
@@ -38,8 +44,7 @@
 		locating = true;
 		try {
 			const position = await currentPosition();
-			lat = position.coords.latitude;
-			lng = position.coords.longitude;
+			onUseGps(position.coords.latitude, position.coords.longitude);
 		} catch (cause) {
 			pushToast(cause instanceof Error ? cause.message : 'Could not read your location.', 'err');
 		} finally {
@@ -92,7 +97,7 @@
 		try {
 			const mediaUrls: string[] = [];
 			for (const preview of previews) {
-				mediaUrls.push(await uploadEvidence(supabase, userId, preview.file));
+				mediaUrls.push(await uploadEvidence(supabase, preview.file));
 			}
 			const id = await createIncident(supabase, {
 				title: title.trim(),
@@ -115,6 +120,7 @@
 	}
 </script>
 
+{#if !picking}
 <div class="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/70 p-0 sm:items-center sm:p-6">
 	<form
 		class="max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-slate-900 p-5 shadow-2xl sm:rounded-3xl"
@@ -180,23 +186,33 @@
 			/>
 		</label>
 
-		<div class="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-slate-700 px-3 py-3">
+		<div class="mb-3 rounded-2xl border border-slate-700 px-3 py-3">
 			<p class="text-sm text-slate-300">
 				{#if lat !== null && lng !== null}
 					{lat.toFixed(5)}, {lng.toFixed(5)}
 				{:else}
-					Location required
+					Choose a location
 				{/if}
 			</p>
-			<button
-				type="button"
-				class="inline-flex items-center gap-1 rounded-full bg-slate-800 px-3 py-2 text-sm text-white"
-				onclick={useMyLocation}
-				disabled={locating}
-			>
-				<LocateFixed size={16} />
-				{locating ? 'Locating…' : 'Use GPS'}
-			</button>
+			<div class="mt-3 flex flex-wrap gap-2">
+				<button
+					type="button"
+					class="inline-flex items-center gap-1 rounded-full bg-slate-800 px-3 py-2 text-sm text-white"
+					onclick={useMyLocation}
+					disabled={locating}
+				>
+					<LocateFixed size={16} />
+					{locating ? 'Locating…' : 'Use GPS'}
+				</button>
+				<button
+					type="button"
+					class="inline-flex items-center gap-1 rounded-full bg-slate-800 px-3 py-2 text-sm text-white"
+					onclick={onDropPin}
+				>
+					<MapPin size={16} />
+					Drop pin on map
+				</button>
+			</div>
 		</div>
 
 		<div class="mb-4">
@@ -246,3 +262,4 @@
 		</button>
 	</form>
 </div>
+{/if}

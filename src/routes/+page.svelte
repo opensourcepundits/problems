@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
-	import { goto } from '$app/navigation';
 	import { Grid3x3, MapPin, Plus } from 'lucide-svelte';
 	import { onMount } from 'svelte';
 	import IncidentCard from '$lib/components/IncidentCard.svelte';
@@ -12,26 +11,27 @@
 	import {
 		CATEGORIES,
 		CATEGORY_LABEL,
+		HOME_VIEWPORT,
 		TIME_WINDOWS,
 		type Category,
 		type Incident,
 		type TileBounds,
 		type Viewport
 	} from '$lib/types';
-	import { mapCommand, pushToast } from '$lib/ui.svelte';
-
-	let { data } = $props();
+	import { mapCommand } from '$lib/ui.svelte';
 
 	let mode = $state<'pins' | 'grid'>('pins');
 	let hours = $state(24);
 	let category = $state<Category | 'all'>('all');
-	let viewport = $state<Viewport>({ center: [0, 15], zoom: 2 });
+	let viewport = $state<Viewport>({ center: HOME_VIEWPORT.center, zoom: HOME_VIEWPORT.zoom });
 	let bounds = $state<TileBounds | null>(null);
 	let focusNonce = $state(0);
 	let focusBounds = $state<[[number, number], [number, number]] | null>(null);
 	let incidents = $state<Incident[]>([]);
 	let selectedId = $state<string | null>(null);
 	let reportOpen = $state(false);
+	let pickingPin = $state(false);
+	let draftPin = $state<{ lng: number; lat: number } | null>(null);
 	let loading = $state(false);
 	let error = $state('');
 	let seenCommand = 0;
@@ -58,11 +58,8 @@
 	}
 
 	function openReport() {
-		if (!data.user) {
-			pushToast('Sign in to file a report.', 'err');
-			void goto('/auth/login?next=/');
-			return;
-		}
+		draftPin = null;
+		pickingPin = false;
 		reportOpen = true;
 	}
 
@@ -78,6 +75,8 @@
 
 	function onCreated(id: string, lng: number, lat: number) {
 		reportOpen = false;
+		pickingPin = false;
+		draftPin = null;
 		mode = 'pins';
 		bounds = null;
 		viewport = { center: [lng, lat], zoom: 15 };
@@ -136,8 +135,15 @@
 			{viewport}
 			{focusNonce}
 			{focusBounds}
+			picking={pickingPin}
+			{draftPin}
 			onViewport={(next) => (viewport = next)}
 			onSelect={(id) => (selectedId = id)}
+			onPick={(lng, lat) => {
+				draftPin = { lng, lat };
+				pickingPin = false;
+				viewport = { center: [lng, lat], zoom: Math.max(viewport.zoom, 14) };
+			}}
 		/>
 	{:else}
 		<MapGridHeatmap {hours} {category} {viewport} onViewport={(next) => (viewport = next)} onDrillDown={drillDown} />
@@ -231,10 +237,38 @@
 	</div>
 {/if}
 
-{#if reportOpen && data.user}
-	<ReportModal userId={data.user.id} onClose={() => (reportOpen = false)} {onCreated} />
+{#if pickingPin}
+	<div class="pointer-events-none absolute inset-x-0 bottom-28 z-20 flex justify-center px-3">
+		<div class="pointer-events-auto flex items-center gap-3 rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-950 shadow-xl">
+			Tap the map to drop the pin
+			<button type="button" class="rounded-full bg-slate-900 px-3 py-1 text-white" onclick={() => (pickingPin = false)}>
+				Back
+			</button>
+		</div>
+	</div>
 {/if}
 
-{#if selected}
-	<IncidentCard incident={selected} userId={data.user?.id ?? null} onClose={() => (selectedId = null)} onChanged={() => void load()} />
+{#if reportOpen}
+	<ReportModal
+		picking={pickingPin}
+		lat={draftPin?.lat ?? null}
+		lng={draftPin?.lng ?? null}
+		onClose={() => {
+			reportOpen = false;
+			pickingPin = false;
+		}}
+		{onCreated}
+		onDropPin={() => {
+			mode = 'pins';
+			pickingPin = true;
+		}}
+		onUseGps={(lat, lng) => {
+			draftPin = { lng, lat };
+			viewport = { center: [lng, lat], zoom: Math.max(viewport.zoom, 14) };
+		}}
+	/>
+{/if}
+
+{#if selected && !pickingPin}
+	<IncidentCard incident={selected} onClose={() => (selectedId = null)} onChanged={() => void load()} />
 {/if}

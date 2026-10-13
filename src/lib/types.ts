@@ -18,7 +18,7 @@ export type VoteType = 'confirm' | 'deny';
 
 export type Incident = {
 	id: string;
-	user_id: string;
+	user_id: string | null;
 	title: string;
 	description: string | null;
 	category: Category;
@@ -40,7 +40,7 @@ export type Incident = {
 export type IncidentComment = {
 	id: string;
 	incident_id: string;
-	user_id: string;
+	user_id: string | null;
 	comment: string;
 	media_url: string | null;
 	created_at: string;
@@ -50,6 +50,11 @@ export type IncidentComment = {
 export type Viewport = {
 	center: [number, number];
 	zoom: number;
+};
+
+export const HOME_VIEWPORT: Viewport = {
+	center: [57.5522, -20.275],
+	zoom: 9.4
 };
 
 export type TileBounds = {

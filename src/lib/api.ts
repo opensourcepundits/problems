@@ -113,9 +113,18 @@ export async function createIncident(
 	return data;
 }
 
-export async function uploadEvidence(supabase: Client, userId: string, file: File): Promise<string> {
+function voterKey() {
+	const storageKey = 'crisis-voter-key';
+	const existing = localStorage.getItem(storageKey);
+	if (existing) return existing;
+	const created = crypto.randomUUID();
+	localStorage.setItem(storageKey, created);
+	return created;
+}
+
+export async function uploadEvidence(supabase: Client, file: File): Promise<string> {
 	const extension = file.name.split('.').pop() || 'bin';
-	const path = `${userId}/${crypto.randomUUID()}.${extension}`;
+	const path = `public/${crypto.randomUUID()}.${extension}`;
 	const { error } = await supabase.storage.from('incident-media').upload(path, file, {
 		contentType: file.type,
 		upsert: false
@@ -164,10 +173,9 @@ export async function fetchComments(supabase: Client, incidentId: string): Promi
 	});
 }
 
-export async function addComment(supabase: Client, incidentId: string, userId: string, comment: string) {
+export async function addComment(supabase: Client, incidentId: string, comment: string) {
 	const { error } = await supabase.from('incident_comments').insert({
 		incident_id: incidentId,
-		user_id: userId,
 		comment,
 		media_url: null
 	});
@@ -179,15 +187,12 @@ export async function deleteComment(supabase: Client, commentId: string) {
 	if (error) throw new Error(message(error, 'Could not delete the comment.'));
 }
 
-export async function vote(supabase: Client, incidentId: string, userId: string, voteType: VoteType) {
-	const { error } = await supabase.from('incident_confirmations').upsert(
-		{
-			incident_id: incidentId,
-			user_id: userId,
-			vote_type: voteType
-		},
-		{ onConflict: 'incident_id,user_id' }
-	);
+export async function vote(supabase: Client, incidentId: string, voteType: VoteType) {
+	const { error } = await supabase.rpc('cast_vote', {
+		p_incident_id: incidentId,
+		p_voter_key: voterKey(),
+		p_vote_type: voteType
+	});
 	if (error) throw new Error(message(error, 'Could not save the vote.'));
 }
 
