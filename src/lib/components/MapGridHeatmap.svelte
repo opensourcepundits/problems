@@ -217,7 +217,7 @@
 				popup = new maplibregl.Popup({ className: 'crisis-popup', maxWidth: '260px' })
 					.setLngLat(event.lngLat)
 					.setHTML(
-						`<p class="text-xs uppercase tracking-wide text-slate-400">${view.km} km hexagon</p>
+						`<p class="text-xs uppercase tracking-wide text-slate-400">${view.km} km square</p>
 						<p class="mt-1 text-lg font-semibold">${total} events</p>
 						<p class="text-sm text-red-300">${critical} critical</p>
 						<p class="mt-1 text-sm text-slate-300">Most common: ${category}</p>
@@ -276,7 +276,7 @@
 </div>
 {#if loading}
 	<p class="pointer-events-none absolute bottom-24 left-3 z-10 rounded-full bg-slate-950/80 px-3 py-1 text-xs text-slate-200">
-		Loading {cellKm} km hexagons…
+		Loading {cellKm} km squares…
 	</p>
 {/if}
 {#if error}

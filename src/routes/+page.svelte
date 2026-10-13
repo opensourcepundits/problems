@@ -235,7 +235,7 @@
 {#if mode === 'grid'}
 	<div class="pointer-events-auto absolute bottom-6 left-3 z-10 w-56 rounded-2xl bg-slate-950/90 px-3 py-3 text-xs text-slate-200 shadow-lg">
 		<label class="block font-medium">
-			Hexagon size · {cellKm} km
+			Square size · {cellKm} km
 			<input
 				class="mt-2 w-full accent-red-500"
 				type="range"
@@ -246,7 +246,7 @@
 				oninput={(event) => (cellKm = Number(event.currentTarget.value))}
 			/>
 		</label>
-		<p class="mt-2 mb-1">Reports in each hexagon</p>
+		<p class="mt-2 mb-1">Reports in each square</p>
 		<div class="flex items-center gap-1">
 			<span class="h-2 flex-1 rounded bg-white"></span>
 			<span class="h-2 flex-1 rounded bg-amber-200"></span>
