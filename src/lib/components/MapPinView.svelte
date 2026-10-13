@@ -49,7 +49,6 @@
 					id: incident.id,
 					category: incident.category,
 					severity: incident.severity,
-					status: incident.status,
 					is_sos: incident.is_sos
 				}
 			}))
@@ -107,6 +106,21 @@
 						'circle-stroke-color': '#fff7ed'
 					}
 				});
+				local.addLayer({
+					id: 'cluster-count',
+					type: 'symbol',
+					source: 'incidents',
+					filter: ['has', 'point_count'],
+					layout: {
+						'text-field': ['to-string', ['get', 'point_count']],
+						'text-font': ['Open Sans Semibold'],
+						'text-size': 13,
+						'text-allow-overlap': true
+					},
+					paint: {
+						'text-color': '#fff7ed'
+					}
+				});
 				addIncidentIcons(local);
 				local.addLayer({
 					id: 'unclustered',
@@ -134,9 +148,6 @@
 						'icon-size': ['case', ['==', ['get', 'is_sos'], true], 0.62, 0.5],
 						'icon-allow-overlap': true,
 						'icon-anchor': 'center'
-					},
-					paint: {
-						'icon-opacity': ['match', ['get', 'status'], 'resolved', 0.45, 1]
 					}
 				});
 				local.addSource('draft', {
@@ -171,15 +182,17 @@
 				onViewport({ center: [center.lng, center.lat], zoom: local.getZoom() });
 			});
 
-			local.on('click', 'clusters', (event) => {
-				if (interaction.picking) return;
-				const clusterId = event.features?.[0]?.properties?.cluster_id;
-				const source = local?.getSource('incidents') as GeoJSONSource | undefined;
-				if (!local || !source || clusterId === undefined) return;
-				void source.getClusterExpansionZoom(Number(clusterId)).then((zoom) => {
-					local?.easeTo({ center: event.lngLat, zoom });
+			for (const layer of ['clusters', 'cluster-count']) {
+				local.on('click', layer, (event) => {
+					if (interaction.picking) return;
+					const clusterId = event.features?.[0]?.properties?.cluster_id;
+					const source = local?.getSource('incidents') as GeoJSONSource | undefined;
+					if (!local || !source || clusterId === undefined) return;
+					void source.getClusterExpansionZoom(Number(clusterId)).then((zoom) => {
+						local?.easeTo({ center: event.lngLat, zoom });
+					});
 				});
-			});
+			}
 
 			local.on('click', 'unclustered', (event) => {
 				if (interaction.picking) return;
@@ -192,7 +205,7 @@
 				interaction.onPick(event.lngLat.lng, event.lngLat.lat);
 			});
 
-			for (const layer of ['clusters', 'unclustered']) {
+			for (const layer of ['clusters', 'cluster-count', 'unclustered']) {
 				local.on('mouseenter', layer, () => {
 					local!.getCanvas().style.cursor = 'pointer';
 				});
