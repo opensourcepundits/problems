@@ -97,6 +97,8 @@
 		void (async () => {
 			const maplibregl = (await import('maplibre-gl')).default;
 			if (disposed) return;
+			node.style.width = '100%';
+			node.style.height = '100%';
 			local = new maplibregl.Map({
 				container: node,
 				center: viewport.center,
@@ -106,6 +108,9 @@
 				pitchWithRotate: false
 			});
 			map = local;
+			const observer = new ResizeObserver(() => local?.resize());
+			observer.observe(node);
+			local.on('remove', () => observer.disconnect());
 			local.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 			local.on('load', () => {
 				if (!local) return;
@@ -216,7 +221,9 @@
 	});
 </script>
 
-<div class="absolute inset-0" bind:this={container}></div>
+<div class="absolute inset-0">
+	<div class="h-full w-full" bind:this={container}></div>
+</div>
 {#if loading}
 	<p class="pointer-events-none absolute bottom-24 left-3 z-10 rounded-full bg-slate-950/80 px-3 py-1 text-xs text-slate-200">
 		Loading 5km squares…

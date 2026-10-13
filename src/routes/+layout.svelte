@@ -4,7 +4,7 @@
 	import { Download, LogOut, Siren } from 'lucide-svelte';
 	import { onMount } from 'svelte';
 	import EmergencySosButton from '$lib/components/EmergencySosButton.svelte';
-	import { createSupabaseBrowserClient, supabaseEnv } from '$lib/supabaseClient';
+	import { createSupabaseBrowserClient, supabaseConfigProblem } from '$lib/supabaseClient';
 	import { toaster } from '$lib/ui.svelte';
 	import '../app.css';
 
@@ -18,7 +18,7 @@
 	let showInstall = $state(false);
 	let iosHint = $state(false);
 	let deferredInstall = $state<BeforeInstallPromptEvent | null>(null);
-	const configured = supabaseEnv() !== null;
+	const configProblem = supabaseConfigProblem();
 	const onMap = $derived(page.url.pathname === '/');
 
 	onMount(() => {
@@ -87,10 +87,8 @@
 		</div>
 	</header>
 
-	{#if !configured}
-		<p class="bg-amber-950 px-4 py-2 text-sm text-amber-100">
-			Copy <code>.env.example</code> to <code>.env</code> and set <code>PUBLIC_SUPABASE_URL</code> and <code>PUBLIC_SUPABASE_ANON_KEY</code>.
-		</p>
+	{#if configProblem}
+		<p class="bg-amber-950 px-4 py-2 text-sm text-amber-100">{configProblem}</p>
 	{/if}
 
 	{#if showInstall}
