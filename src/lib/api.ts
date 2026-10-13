@@ -51,14 +51,17 @@ export async function fetchIncidents(
 	category: Category | 'all',
 	bounds: TileBounds | null
 ): Promise<Incident[]> {
-	const { data, error } = await supabase.rpc('get_incidents', {
-		hours_back: hours,
-		category_filter: category === 'all' ? null : category,
-		min_lng: bounds?.minLng ?? null,
-		min_lat: bounds?.minLat ?? null,
-		max_lng: bounds?.maxLng ?? null,
-		max_lat: bounds?.maxLat ?? null
-	});
+	const filters: Database['public']['Functions']['get_incidents']['Args'] = {
+		hours_back: hours
+	};
+	if (category !== 'all') filters.category_filter = category;
+	if (bounds) {
+		filters.min_lng = bounds.minLng;
+		filters.min_lat = bounds.minLat;
+		filters.max_lng = bounds.maxLng;
+		filters.max_lat = bounds.maxLat;
+	}
+	const { data, error } = await supabase.rpc('get_incidents', filters);
 	if (error) throw new Error(message(error, 'Could not load incidents.'));
 	return (data ?? []).map(asIncident);
 }
@@ -68,10 +71,11 @@ export async function fetchGrid(
 	hours: number,
 	category: Category | 'all'
 ): Promise<GridFeatureCollection> {
-	const { data, error } = await supabase.rpc('get_5km_grid', {
-		hours_back: hours,
-		category_filter: category === 'all' ? null : category
-	});
+	const filters: Database['public']['Functions']['get_5km_grid']['Args'] = {
+		hours_back: hours
+	};
+	if (category !== 'all') filters.category_filter = category;
+	const { data, error } = await supabase.rpc('get_5km_grid', filters);
 	if (error) throw new Error(message(error, 'Could not load the 5km grid.'));
 	const collection = data as GridFeatureCollection | null;
 	if (!collection || collection.type !== 'FeatureCollection' || !Array.isArray(collection.features)) {
@@ -96,12 +100,12 @@ export async function createIncident(
 ): Promise<string> {
 	const { data, error } = await supabase.rpc('create_incident', {
 		p_title: input.title,
-		p_description: input.description || null,
+		p_description: input.description,
 		p_category: input.category,
 		p_severity: input.severity,
 		p_lng: input.lng,
 		p_lat: input.lat,
-		p_address_hint: input.addressHint || null,
+		p_address_hint: input.addressHint,
 		p_media_urls: input.mediaUrls,
 		p_is_sos: input.isSos
 	});
