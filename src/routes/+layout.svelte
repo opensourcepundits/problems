@@ -5,7 +5,7 @@
 	import { onMount } from 'svelte';
 	import EmergencySosButton from '$lib/components/EmergencySosButton.svelte';
 	import { createSupabaseBrowserClient, supabaseConfigProblem } from '$lib/supabaseClient';
-	import { toaster } from '$lib/ui.svelte';
+	import { pushToast, toaster } from '$lib/ui.svelte';
 	import '../app.css';
 
 	interface BeforeInstallPromptEvent extends Event {
@@ -22,6 +22,19 @@
 	const onMap = $derived(page.url.pathname === '/');
 
 	onMount(() => {
+		const params = new URLSearchParams(window.location.search);
+		const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+		const authError = params.get('error_description') || hash.get('error_description');
+		if (authError) {
+			pushToast(decodeURIComponent(authError.replace(/\+/g, ' ')), 'err');
+			const clean = new URL(window.location.href);
+			clean.searchParams.delete('error');
+			clean.searchParams.delete('error_code');
+			clean.searchParams.delete('error_description');
+			clean.hash = '';
+			history.replaceState({}, '', `${clean.pathname}${clean.search}`);
+		}
+
 		const standalone = window.matchMedia('(display-mode: standalone)').matches;
 		const dismissed = sessionStorage.getItem('install-dismissed') === '1';
 		const ios = /iphone|ipad|ipod/i.test(window.navigator.userAgent);

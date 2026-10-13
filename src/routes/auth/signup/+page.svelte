@@ -24,6 +24,7 @@
 			email: email.trim(),
 			password,
 			options: {
+				emailRedirectTo: `${window.location.origin}/auth/login`,
 				data: {
 					full_name: fullName.trim(),
 					phone_number: phone.trim()
