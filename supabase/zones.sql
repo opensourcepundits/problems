@@ -1,5 +1,5 @@
-﻿-- Run once in the Supabase SQL Editor.
--- Hexagon zones, multi-category filters, and a confirm/deny toggle that can be cleared.
+﻿-- Run this whole script once in the Supabase SQL Editor.
+-- Replaces the map functions, lets a vote be cleared, and adds resolved.
 
 create or replace function public.cast_vote(
   p_incident_id uuid,
@@ -15,7 +15,7 @@ begin
   if p_voter_key is null or char_length(p_voter_key) < 8 or char_length(p_voter_key) > 80 then
     raise exception 'invalid voter key' using errcode = '22023';
   end if;
-  if p_vote_type is null or btrim(p_vote_type) = '' then
+  if p_vote_type is null or btrim(p_vote_type) in ('', 'clear') then
     delete from public.incident_confirmations
     where incident_id = p_incident_id and voter_key = p_voter_key;
     return;
@@ -36,6 +36,32 @@ $$;
 
 revoke all on function public.cast_vote(uuid, text, text) from public;
 grant execute on function public.cast_vote(uuid, text, text) to anon, authenticated;
+
+create or replace function public.set_incident_resolved(
+  p_incident_id uuid,
+  p_resolved boolean
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+begin
+  update public.incidents
+  set status = case
+    when coalesce(p_resolved, false) then 'resolved'::public.incident_status
+    else 'unverified'::public.incident_status
+  end
+  where id = p_incident_id;
+
+  if not found then
+    raise exception 'incident not found' using errcode = 'P0002';
+  end if;
+end;
+$$;
+
+revoke all on function public.set_incident_resolved(uuid, boolean) from public;
+grant execute on function public.set_incident_resolved(uuid, boolean) to anon, authenticated;
 
 drop function if exists public.get_incidents(int, text, double precision, double precision, double precision, double precision);
 

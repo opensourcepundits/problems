@@ -34,50 +34,72 @@
 	let requestId = 0;
 	const view = { km: 5 };
 
-	function heatColor(km: number): ExpressionSpecification {
-		const step = Math.max(1, km);
-		return [
-			'interpolate',
-			['linear'],
-			['get', 'total_count'],
-			0,
-			'#ffffff',
-			step,
-			'#fef3c7',
-			step * 2,
-			'#facc15',
-			step * 4,
-			'#f97316',
-			step * 8,
-			'#dc2626',
-			step * 14,
-			'#7e22ce'
-		];
-	}
+	const heatValue: ExpressionSpecification = ['get', 'heat'];
+	const heatColor: ExpressionSpecification = [
+		'interpolate',
+		['linear'],
+		heatValue,
+		0,
+		'#ffffff',
+		0.12,
+		'#fde047',
+		0.32,
+		'#f59e0b',
+		0.55,
+		'#f97316',
+		0.78,
+		'#dc2626',
+		1,
+		'#6b21a8'
+	];
+	const heatOpacity: ExpressionSpecification = [
+		'interpolate',
+		['linear'],
+		heatValue,
+		0,
+		0.28,
+		0.12,
+		0.72,
+		1,
+		0.9
+	];
 
-	function heatOpacity(km: number): ExpressionSpecification {
-		const step = Math.max(1, km);
-		return ['interpolate', ['linear'], ['get', 'total_count'], 0, 0.45, step, 0.62, step * 8, 0.84];
-	}
-
-	function tileBounds(geometry: Polygon): TileBounds | null {
-		const ring = geometry.coordinates[0];
-		if (!ring?.length) return null;
+	function tileBounds(geometry: { coordinates: unknown }): TileBounds | null {
 		let minLng = Infinity;
 		let minLat = Infinity;
 		let maxLng = -Infinity;
 		let maxLat = -Infinity;
-		for (const pair of ring) {
-			const lng = pair[0];
-			const lat = pair[1];
-			if (lng === undefined || lat === undefined) continue;
-			minLng = Math.min(minLng, lng);
-			minLat = Math.min(minLat, lat);
-			maxLng = Math.max(maxLng, lng);
-			maxLat = Math.max(maxLat, lat);
-		}
+		const visit = (value: unknown) => {
+			if (!Array.isArray(value) || value.length === 0) return;
+			if (typeof value[0] === 'number' && typeof value[1] === 'number') {
+				minLng = Math.min(minLng, value[0]);
+				minLat = Math.min(minLat, value[1]);
+				maxLng = Math.max(maxLng, value[0]);
+				maxLat = Math.max(maxLat, value[1]);
+				return;
+			}
+			for (const child of value) visit(child);
+		};
+		visit(geometry.coordinates);
 		if (!Number.isFinite(minLng)) return null;
 		return { minLng, minLat, maxLng, maxLat };
+	}
+
+	function applyHeat() {
+		if (!map?.getLayer('grid-fill')) return;
+		map.setPaintProperty('grid-fill', 'fill-color', heatColor);
+		map.setPaintProperty('grid-fill', 'fill-opacity', heatOpacity);
+		if (map.getLayer('grid-line')) {
+			map.setPaintProperty('grid-line', 'line-color', [
+				'interpolate',
+				['linear'],
+				heatValue,
+				0,
+				'#94a3b8',
+				1,
+				'#3b0764'
+			]);
+		}
 	}
 
 	function escapeHtml(value: string) {
@@ -105,8 +127,17 @@
 		try {
 			const collection = await fetchGrid(supabase, hours, categories, cellKm);
 			if (current !== requestId) return;
+			const counts = collection.features.map((feature) => Number(feature.properties.total_count) || 0);
+			const maxCount = counts.reduce((highest, count) => Math.max(highest, count), 0);
+			for (const feature of collection.features) {
+				const count = Number(feature.properties.total_count) || 0;
+				feature.properties.total_count = count;
+				feature.properties.critical_count = Number(feature.properties.critical_count) || 0;
+				feature.properties.heat = maxCount === 0 ? 0 : Math.sqrt(count / maxCount);
+			}
 			const source = map?.getSource('grid') as GeoJSONSource | undefined;
 			source?.setData(collection as FeatureCollection<Polygon>);
+			applyHeat();
 		} catch (cause) {
 			if (current !== requestId) return;
 			error = cause instanceof Error ? cause.message : 'Could not load the grid.';
@@ -175,7 +206,7 @@
 
 			local.on('click', 'grid-fill', (event) => {
 				const feature = event.features?.[0];
-				if (!feature || feature.geometry.type !== 'Polygon' || !local) return;
+				if (!feature || (feature.geometry.type !== 'Polygon' && feature.geometry.type !== 'MultiPolygon') || !local) return;
 				const props = feature.properties ?? {};
 				const total = Number(props.total_count ?? 0);
 				const critical = Number(props.critical_count ?? 0);
@@ -222,8 +253,7 @@
 		void hours;
 		void selected;
 		if (!map || !ready) return;
-		map.setPaintProperty('grid-fill', 'fill-color', heatColor(cellKm));
-		map.setPaintProperty('grid-fill', 'fill-opacity', heatOpacity(cellKm));
+		applyHeat();
 		void loadGrid();
 	});
 

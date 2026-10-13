@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { ThumbsDown, ThumbsUp, X } from 'lucide-svelte';
-	import { addComment, fetchComments, fetchMyVote, vote } from '$lib/api';
+	import { Check, ThumbsDown, ThumbsUp, X } from 'lucide-svelte';
+	import { addComment, fetchComments, fetchMyVote, setResolved, vote } from '$lib/api';
 	import { createSupabaseBrowserClient } from '$lib/supabaseClient';
 	import { CATEGORY_LABEL, type Incident, type IncidentComment, type VoteType } from '$lib/types';
 	import { pushToast } from '$lib/ui.svelte';
@@ -82,6 +82,20 @@
 		}
 	}
 
+	async function toggleResolved() {
+		const supabase = createSupabaseBrowserClient();
+		if (!supabase) return;
+		busy = true;
+		try {
+			await setResolved(supabase, incident.id, incident.status !== 'resolved');
+			onChanged();
+		} catch (cause) {
+			pushToast(cause instanceof Error ? cause.message : 'Could not update the incident.', 'err');
+		} finally {
+			busy = false;
+		}
+	}
+
 	async function publishComment(event: SubmitEvent) {
 		event.preventDefault();
 		const text = draft.trim();
@@ -120,7 +134,23 @@
 			</button>
 		</div>
 
-		<p class="mb-3 inline-flex rounded-full bg-slate-800 px-2 py-1 text-xs text-slate-200 capitalize">{incident.status}</p>
+		<button
+			type="button"
+			class="mb-4 flex w-full items-center justify-between gap-3 rounded-2xl border-2 px-4 py-3 text-left {incident.status === 'resolved' ? 'border-emerald-300 bg-emerald-600 text-white' : 'border-slate-600 bg-slate-950 text-slate-200'}"
+			aria-pressed={incident.status === 'resolved'}
+			disabled={busy}
+			onclick={toggleResolved}
+		>
+			<span>
+				<span class="block text-sm font-semibold">Resolved</span>
+				<span class="mt-0.5 block text-xs {incident.status === 'resolved' ? 'text-emerald-50' : 'text-slate-400'}">
+					{incident.status === 'resolved' ? 'This report is marked resolved. Tap to reopen it.' : 'Tap to mark this report resolved.'}
+				</span>
+			</span>
+			<span class="grid h-8 w-8 shrink-0 place-items-center rounded-full {incident.status === 'resolved' ? 'bg-white text-emerald-700' : 'bg-slate-800 text-slate-500'}">
+				<Check size={18} />
+			</span>
+		</button>
 
 		{#if activeMedia}
 			<div class="relative mb-4 overflow-hidden rounded-2xl bg-black">

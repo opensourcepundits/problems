@@ -52,9 +52,9 @@ export async function fetchIncidents(
 	bounds: TileBounds | null
 ): Promise<Incident[]> {
 	const filters: Database['public']['Functions']['get_incidents']['Args'] = {
-		hours_back: hours
+		hours_back: hours,
+		categories
 	};
-	if (categories.length > 0) filters.categories = categories;
 	if (bounds) {
 		filters.min_lng = bounds.minLng;
 		filters.min_lat = bounds.minLat;
@@ -74,9 +74,9 @@ export async function fetchGrid(
 ): Promise<GridFeatureCollection> {
 	const filters: Database['public']['Functions']['get_zone_grid']['Args'] = {
 		hours_back: hours,
+		categories,
 		cell_km: cellKm
 	};
-	if (categories.length > 0) filters.categories = categories;
 	const { data, error } = await supabase.rpc('get_zone_grid', filters);
 	if (error) throw new Error(message(error, 'Could not load the zones.'));
 	const collection = data as GridFeatureCollection | null;
@@ -201,11 +201,19 @@ export async function fetchMyVote(supabase: Client, incidentId: string): Promise
 	return null;
 }
 
+export async function setResolved(supabase: Client, incidentId: string, resolved: boolean) {
+	const { error } = await supabase.rpc('set_incident_resolved', {
+		p_incident_id: incidentId,
+		p_resolved: resolved
+	});
+	if (error) throw new Error(message(error, 'Could not update the incident.'));
+}
+
 export async function vote(supabase: Client, incidentId: string, voteType: VoteType | null) {
 	const { error } = await supabase.rpc('cast_vote', {
 		p_incident_id: incidentId,
 		p_voter_key: voterKey(),
-		p_vote_type: voteType ?? ''
+		p_vote_type: voteType ?? 'clear'
 	});
 	if (error) throw new Error(message(error, 'Could not save the vote.'));
 }

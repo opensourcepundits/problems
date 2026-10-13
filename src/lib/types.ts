@@ -68,11 +68,12 @@ export type GridFeatureCollection = {
 	type: 'FeatureCollection';
 	features: Array<{
 		type: 'Feature';
-		geometry: { type: 'Polygon'; coordinates: number[][][] };
+		geometry: { type: 'Polygon' | 'MultiPolygon'; coordinates: number[][][] | number[][][][] };
 		properties: {
 			total_count: number;
 			critical_count: number;
 			top_category: string | null;
+			heat?: number;
 		};
 	}>;
 };

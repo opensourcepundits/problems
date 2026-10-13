@@ -185,6 +185,13 @@ export type Database = {
 					author_name: string | null;
 				}[];
 			};
+			set_incident_resolved: {
+				Args: {
+					p_incident_id: string;
+					p_resolved: boolean;
+				};
+				Returns: undefined;
+			};
 			cast_vote: {
 				Args: {
 					p_incident_id: string;

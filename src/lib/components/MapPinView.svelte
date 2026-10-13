@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import 'maplibre-gl/dist/maplibre-gl.css';
+	import { addIncidentIcons, CATEGORY_ICON } from '$lib/mapIcons';
 	import { osmStyle } from '$lib/mapStyle';
-	import { SEVERITY_COLOR, type Incident, type Viewport } from '$lib/types';
+	import type { Incident, Viewport } from '$lib/types';
 	import type { FeatureCollection, Point } from 'geojson';
 	import type { GeoJSONSource, Map } from 'maplibre-gl';
 
@@ -46,6 +47,7 @@
 				geometry: { type: 'Point', coordinates: [incident.lng, incident.lat] },
 				properties: {
 					id: incident.id,
+					category: incident.category,
 					severity: incident.severity,
 					status: incident.status,
 					is_sos: incident.is_sos
@@ -105,29 +107,36 @@
 						'circle-stroke-color': '#fff7ed'
 					}
 				});
+				addIncidentIcons(local);
 				local.addLayer({
 					id: 'unclustered',
-					type: 'circle',
+					type: 'symbol',
 					source: 'incidents',
 					filter: ['!', ['has', 'point_count']],
-					paint: {
-						'circle-color': [
+					layout: {
+						'icon-image': [
 							'match',
-							['get', 'severity'],
-							'critical',
-							SEVERITY_COLOR.critical,
-							'high',
-							SEVERITY_COLOR.high,
-							'medium',
-							SEVERITY_COLOR.medium,
-							'low',
-							SEVERITY_COLOR.low,
-							'#94a3b8'
+							['get', 'category'],
+							'fire',
+							CATEGORY_ICON.fire,
+							'looting',
+							CATEGORY_ICON.looting,
+							'casualty',
+							CATEGORY_ICON.casualty,
+							'accident',
+							CATEGORY_ICON.accident,
+							'roadblock',
+							CATEGORY_ICON.roadblock,
+							'sos',
+							CATEGORY_ICON.sos,
+							CATEGORY_ICON.other
 						],
-						'circle-radius': ['case', ['==', ['get', 'is_sos'], true], 10, 7],
-						'circle-stroke-width': ['case', ['==', ['get', 'is_sos'], true], 3, 1.5],
-						'circle-stroke-color': '#fff7ed',
-						'circle-opacity': ['match', ['get', 'status'], 'resolved', 0.45, 0.95]
+						'icon-size': ['case', ['==', ['get', 'is_sos'], true], 0.62, 0.5],
+						'icon-allow-overlap': true,
+						'icon-anchor': 'center'
+					},
+					paint: {
+						'icon-opacity': ['match', ['get', 'status'], 'resolved', 0.45, 1]
 					}
 				});
 				local.addSource('draft', {

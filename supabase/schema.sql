@@ -550,7 +550,7 @@ begin
   if p_voter_key is null or char_length(p_voter_key) < 8 or char_length(p_voter_key) > 80 then
     raise exception 'invalid voter key' using errcode = '22023';
   end if;
-  if p_vote_type is null or btrim(p_vote_type) = '' then
+  if p_vote_type is null or btrim(p_vote_type) in ('', 'clear') then
     delete from public.incident_confirmations
     where incident_id = p_incident_id and voter_key = p_voter_key;
     return;
@@ -571,6 +571,32 @@ $$;
 
 revoke all on function public.cast_vote(uuid, text, text) from public;
 grant execute on function public.cast_vote(uuid, text, text) to anon, authenticated;
+
+create or replace function public.set_incident_resolved(
+  p_incident_id uuid,
+  p_resolved boolean
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+begin
+  update public.incidents
+  set status = case
+    when coalesce(p_resolved, false) then 'resolved'::public.incident_status
+    else 'unverified'::public.incident_status
+  end
+  where id = p_incident_id;
+
+  if not found then
+    raise exception 'incident not found' using errcode = 'P0002';
+  end if;
+end;
+$$;
+
+revoke all on function public.set_incident_resolved(uuid, boolean) from public;
+grant execute on function public.set_incident_resolved(uuid, boolean) to anon, authenticated;
 
 drop function if exists public.get_incidents(int, text, double precision, double precision, double precision, double precision);
 
@@ -646,9 +672,9 @@ $$;
 revoke all on function public.get_incidents(int, text[], double precision, double precision, double precision, double precision) from public;
 grant execute on function public.get_incidents(int, text[], double precision, double precision, double precision, double precision) to anon, authenticated;
 
--- Hexagons covering the main island of Mauritius. cell_km is the distance
--- between parallel sides, from 1 to 10. Empty cells are included so the island
--- stays covered when nothing has been reported. Debunked reports are excluded.
+-- Hexagons clipped to the main island of Mauritius. cell_km is the distance
+-- between parallel sides, from 1 to 10. Empty land cells stay in the result.
+-- Debunked reports are excluded.
 drop function if exists public.get_5km_grid(int, text);
 drop function if exists public.get_zone_grid(int, text[], int);
 
@@ -667,14 +693,35 @@ declare
   result jsonb;
   v_km int := least(greatest(coalesce(cell_km, 5), 1), 10);
   v_edge double precision := (v_km * 1000.0) / sqrt(3.0);
-  v_bounds geometry := ST_Expand(
-    ST_Transform(ST_MakeEnvelope(57.307, -20.525, 57.805, -19.948, 4326), 3857),
-    1500
+  island geometry := ST_Buffer(
+    ST_Transform(
+      ST_MakePolygon(ST_GeomFromText(
+        'LINESTRING(
+          57.614 -19.984, 57.655 -19.994, 57.705 -20.025, 57.745 -20.075,
+          57.768 -20.135, 57.790 -20.200, 57.802 -20.270, 57.790 -20.335,
+          57.760 -20.390, 57.720 -20.430, 57.675 -20.468, 57.620 -20.500,
+          57.555 -20.522, 57.490 -20.515, 57.425 -20.492, 57.365 -20.472,
+          57.318 -20.452, 57.308 -20.425, 57.340 -20.370, 57.358 -20.310,
+          57.368 -20.250, 57.400 -20.195, 57.455 -20.162, 57.505 -20.148,
+          57.535 -20.105, 57.562 -20.055, 57.588 -20.015, 57.614 -19.984
+        )',
+        4326
+      )),
+      3857
+    ),
+    400
   );
 begin
   with cells as (
-    select g.geom as cell, g.i as cell_i, g.j as cell_j
-    from ST_HexagonGrid(v_edge, v_bounds) as g
+    select
+      ST_CollectionExtract(ST_MakeValid(ST_Intersection(g.geom, island)), 3) as cell
+    from ST_HexagonGrid(v_edge, ST_Expand(island, v_edge)) as g
+    where ST_Intersects(g.geom, island)
+  ),
+  land as (
+    select cell
+    from cells
+    where cell is not null and not ST_IsEmpty(cell)
   ),
   pts as (
     select
@@ -690,26 +737,21 @@ begin
         or category::text = any(categories)
       )
   ),
-  assigned as (
-    select p.category, p.severity, hit.cell_i, hit.cell_j
-    from pts p
-    join lateral (
-      select c.cell_i, c.cell_j
-      from cells c
-      where ST_Intersects(c.cell, p.geom)
-      order by c.cell_i, c.cell_j
-      limit 1
-    ) hit on true
-  ),
   agg as (
     select
       c.cell,
-      count(a.category)::int as total_count,
-      count(a.category) filter (where a.severity = 'critical')::int as critical_count,
-      mode() within group (order by a.category) as top_category
-    from cells c
-    left join assigned a on a.cell_i = c.cell_i and a.cell_j = c.cell_j
-    group by c.cell_i, c.cell_j, c.cell
+      coalesce(s.total_count, 0) as total_count,
+      coalesce(s.critical_count, 0) as critical_count,
+      s.top_category
+    from land c
+    left join lateral (
+      select
+        count(*)::int as total_count,
+        count(*) filter (where p.severity = 'critical')::int as critical_count,
+        mode() within group (order by p.category) as top_category
+      from pts p
+      where ST_Intersects(p.geom, c.cell)
+    ) s on true
   )
   select jsonb_build_object(
     'type', 'FeatureCollection',
