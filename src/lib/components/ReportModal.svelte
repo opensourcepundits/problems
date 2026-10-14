@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Camera, Check, LoaderCircle, LocateFixed, MapPin, MapPinOff, RotateCcw, Send, X } from 'lucide-svelte';
+	import { Camera, Check, Link, LoaderCircle, LocateFixed, MapPin, MapPinOff, RotateCcw, Send, X } from 'lucide-svelte';
 	import { onDestroy, type Snippet } from 'svelte';
 	import { createIncident, currentPosition, RateLimitError, uploadEvidence } from '$lib/api';
 	import { t } from '$lib/i18n/index.svelte';
@@ -14,6 +14,8 @@
 	import MiniMap from './ui/MiniMap.svelte';
 	import Notice from './ui/Notice.svelte';
 	import SeverityMeter from './ui/SeverityMeter.svelte';
+	import SourceCard from './ui/SourceCard.svelte';
+	import { parseSource } from '$lib/sources';
 	import { CATEGORY_ICON } from './ui/icons';
 
 	let {
@@ -39,6 +41,8 @@
 	let category = $state<Category | null>(null);
 	let severity = $state<Severity>('medium');
 	let addressHint = $state('');
+	let sourceText = $state('');
+	let sourceTouched = $state(false);
 	let phase = $state<'editing' | 'submitting' | 'success' | 'error'>('editing');
 	let errorMessage = $state('');
 	let tried = $state(false);
@@ -51,9 +55,11 @@
 
 	const MAX_MEDIA = 4;
 	const hasLocation = $derived(lat !== null && lng !== null);
+	const source = $derived(parseSource(sourceText));
+	const sourceInvalid = $derived(!!sourceText.trim() && !source);
 	const videoWarning = $derived(previews.some((item) => item.video));
 	const missing = $derived(
-		[!category && 'category', !hasLocation && 'location', !title.trim() && 'title'].filter(
+		[!category && 'category', !hasLocation && 'location', !title.trim() && 'title', sourceInvalid && 'source'].filter(
 			(item): item is string => !!item
 		)
 	);
@@ -138,7 +144,8 @@
 				lat,
 				addressHint: addressHint.trim(),
 				mediaUrls,
-				isSos: false
+				isSos: false,
+				sourceUrl: source?.url ?? null
 			});
 			created = { id, lng, lat };
 			phase = 'success';
@@ -146,6 +153,8 @@
 			errorMessage =
 				cause instanceof RateLimitError
 					? t('rate_limited_report', { min: Math.ceil(cause.retryAfterSeconds / 60) })
+					: cause instanceof Error && cause.message.includes('source_url_not_allowed')
+						? t('source_invalid')
 					: cause instanceof TypeError
 						? t('not_sent_body')
 						: cause instanceof Error
@@ -400,6 +409,37 @@
 			{@render mediaStrip()}
 			<Notice tone="privacy">{t('privacy')}</Notice>
 			{#if videoWarning}<Notice tone="warning">{t('video_warn')}</Notice>{/if}
+			{#if source}
+				<div class="flex flex-col gap-1.5">
+					<span class="text-label font-bold text-fg-secondary">{t('source_label')}</span>
+					<SourceCard {source} onRemove={() => (sourceText = '')} />
+				</div>
+			{:else}
+				{#snippet sourceInput()}
+					<span class="relative block">
+						<Link size={18} class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-fg-tertiary" />
+						<input
+							class="h-12 w-full rounded-md border bg-surface-input pr-3.5 pl-10 text-body text-fg outline-none placeholder:text-fg-tertiary focus:shadow-[0_0_0_3px_var(--accent-tint-strong)] {sourceInvalid && (sourceTouched || tried)
+								? 'border-alarm-400'
+								: 'border-line-input focus:border-[var(--border-focus)]'}"
+							type="url"
+							inputmode="url"
+							autocomplete="off"
+							autocapitalize="off"
+							spellcheck="false"
+							maxlength="500"
+							placeholder={t('source_ph')}
+							aria-invalid={sourceInvalid && (sourceTouched || tried) ? true : undefined}
+							bind:value={sourceText}
+							onblur={() => (sourceTouched = true)}
+						/>
+					</span>
+					{#if !(sourceInvalid && (sourceTouched || tried))}
+						<span class="text-caption font-normal text-fg-tertiary">{t('source_hint')}</span>
+					{/if}
+				{/snippet}
+				{@render field(t('source_label'), true, '', sourceInvalid && (sourceTouched || tried) ? t('source_invalid') : '', sourceInput)}
+			{/if}
 		{/snippet}
 		{@render group('5', t('q5'), `${previews.length}/${MAX_MEDIA}`, 'muted', media)}
 	</div>

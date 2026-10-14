@@ -24,7 +24,9 @@
 	import CategoryTile from './ui/CategoryTile.svelte';
 	import IconButton from './ui/IconButton.svelte';
 	import SeverityBadge from './ui/SeverityBadge.svelte';
+	import SourceCard from './ui/SourceCard.svelte';
 	import StatusBadge from './ui/StatusBadge.svelte';
+	import { parseSource } from '$lib/sources';
 
 	let {
 		incident,
@@ -49,6 +51,7 @@
 	let syncedId = '';
 
 	const media = $derived(incident.media_urls);
+	const source = $derived(parseSource(incident.source_url));
 	const category = $derived(incident.is_sos ? 'sos' : incident.category);
 	const debunked = $derived(incident.status === 'debunked');
 	const total = $derived(incident.confirm_count + incident.deny_count);
@@ -186,6 +189,8 @@
 		</div>
 
 		<p class="text-body whitespace-pre-wrap text-fg-secondary">{incident.description || t('no_description')}</p>
+
+		{#if source}<SourceCard {source} />{/if}
 
 		{#if media.length}
 			<div class="relative aspect-[4/3] overflow-hidden rounded-[14px] bg-[#000]">

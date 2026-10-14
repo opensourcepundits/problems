@@ -35,6 +35,7 @@ export type Incident = {
 	deny_count: number;
 	comment_count: number;
 	author_name: string | null;
+	source_url: string | null;
 };
 
 export type IncidentComment = {

@@ -41,7 +41,8 @@ function asIncident(row: Database['public']['Functions']['get_incidents']['Retur
 		confirm_count: Number(row.confirm_count),
 		deny_count: Number(row.deny_count),
 		comment_count: Number(row.comment_count),
-		author_name: row.author_name
+		author_name: row.author_name,
+		source_url: row.source_url ?? null
 	};
 }
 
@@ -98,6 +99,7 @@ export async function createIncident(
 		addressHint: string;
 		mediaUrls: string[];
 		isSos: boolean;
+		sourceUrl?: string | null;
 	}
 ): Promise<string> {
 	const args = {
@@ -111,9 +113,18 @@ export async function createIncident(
 		p_media_urls: input.mediaUrls,
 		p_is_sos: input.isSos
 	};
-	let { data, error } = await supabase.rpc('create_incident', { ...args, p_client_key: voterKey() });
-	// Before supabase/rate_limits.sql is applied the RPC has no p_client_key parameter.
-	if (error?.code === 'PGRST202') ({ data, error } = await supabase.rpc('create_incident', args));
+	// Newest signature first; older ones cover databases where source_links.sql or
+	// rate_limits.sql has not been applied yet (PostgREST answers PGRST202).
+	const attempts = [
+		{ ...args, p_client_key: voterKey(), p_source_url: input.sourceUrl || null },
+		{ ...args, p_client_key: voterKey() },
+		args
+	];
+	let { data, error } = await supabase.rpc('create_incident', attempts[0]);
+	for (const next of attempts.slice(1)) {
+		if (error?.code !== 'PGRST202') break;
+		({ data, error } = await supabase.rpc('create_incident', next));
+	}
 	const limited = error ? rateLimit(error.message) : null;
 	if (limited) throw limited;
 	if (error || !data) throw new Error(message(error, 'Could not save the incident.'));

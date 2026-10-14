@@ -35,6 +35,7 @@ export type Database = {
 					status: Database['public']['Enums']['incident_status'];
 					is_sos: boolean;
 					hidden: boolean;
+					source_url: string | null;
 					created_at: string;
 					updated_at: string;
 				};
@@ -50,6 +51,7 @@ export type Database = {
 					status?: Database['public']['Enums']['incident_status'];
 					is_sos?: boolean;
 					hidden?: boolean;
+					source_url?: string | null;
 					created_at?: string;
 					updated_at?: string;
 				};
@@ -62,6 +64,7 @@ export type Database = {
 					media_urls?: string[];
 					status?: Database['public']['Enums']['incident_status'];
 					hidden?: boolean;
+					source_url?: string | null;
 				};
 				Relationships: [];
 			};
@@ -156,6 +159,7 @@ export type Database = {
 					p_media_urls?: string[];
 					p_is_sos?: boolean;
 					p_client_key?: string | null;
+					p_source_url?: string | null;
 				};
 				Returns: string;
 			};
@@ -187,6 +191,7 @@ export type Database = {
 					deny_count: number;
 					comment_count: number;
 					author_name: string | null;
+					source_url?: string | null;
 				}[];
 			};
 			set_incident_resolved: {

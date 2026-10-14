@@ -21,6 +21,7 @@ export type AdminIncident = {
 	is_sos: boolean;
 	confirm_count: number;
 	deny_count: number;
+	source_url: string | null;
 };
 
 function digest(value: string) {
@@ -107,19 +108,23 @@ export async function listIncidents(): Promise<AdminIncident[]> {
 	const supabase = adminClient();
 	if (!supabase) throw new Error('Admin database access is not configured.');
 	// The generated types carry no relationships, so the embedded vote rows are typed by hand.
-	const { data, error } = await supabase
-		.from('incidents')
-		.select(
-			'id, title, description, category, severity, status, hidden, created_at, address_hint, is_sos, incident_confirmations(vote_type)'
-		)
-		.order('created_at', { ascending: false })
-		.limit(500);
+	// source_url exists once supabase/source_links.sql has run; fall back to the older column list.
+	const columns =
+		'id, title, description, category, severity, status, hidden, created_at, address_hint, is_sos, incident_confirmations(vote_type)';
+	const query = (select: string) =>
+		supabase.from('incidents').select(select).order('created_at', { ascending: false }).limit(500);
+	let { data, error }: { data: unknown; error: { code?: string; message: string } | null } = await query(
+		`${columns}, source_url`
+	);
+	if (error?.code === '42703') ({ data, error } = await query(columns));
 	if (error) throw new Error(error.message);
-	type Row = Omit<AdminIncident, 'confirm_count' | 'deny_count'> & {
+	type Row = Omit<AdminIncident, 'confirm_count' | 'deny_count' | 'source_url'> & {
+		source_url?: string | null;
 		incident_confirmations: { vote_type: string }[] | null;
 	};
 	return ((data ?? []) as unknown as Row[]).map(({ incident_confirmations: votes, ...row }) => ({
 		...row,
+		source_url: row.source_url ?? null,
 		confirm_count: votes?.filter((item) => item.vote_type === 'confirm').length ?? 0,
 		deny_count: votes?.filter((item) => item.vote_type === 'deny').length ?? 0
 	}));

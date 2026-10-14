@@ -934,8 +934,8 @@ end $$;
 
 notify pgrst, 'reload schema';
 
--- Follow-up files, run in order after this one: anonymous.sql, admin.sql, squares.sql, zones.sql, rate_limits.sql.
--- rate_limits.sql replaces create_incident with a version that takes p_client_key.
+-- Follow-up files, run in order after this one: anonymous.sql, admin.sql, squares.sql, zones.sql, rate_limits.sql, source_links.sql.
+-- rate_limits.sql and source_links.sql each replace create_incident (adding p_client_key, then p_source_url).
 
 -- Promote an operator in the SQL editor (users cannot set app_metadata themselves):
 -- update auth.users

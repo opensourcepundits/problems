@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Eye, EyeOff, Lock, LogOut } from 'lucide-svelte';
+	import { ExternalLink, Eye, EyeOff, Lock, LogOut } from 'lucide-svelte';
 	import AppHeader from '$lib/components/ui/AppHeader.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
@@ -8,6 +8,7 @@
 	import SegmentedControl from '$lib/components/ui/SegmentedControl.svelte';
 	import SeverityBadge from '$lib/components/ui/SeverityBadge.svelte';
 	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
+	import { parseSource } from '$lib/sources';
 	import { CATEGORY_LABEL, isCategory, isSeverity, isStatus, type Category } from '$lib/types';
 
 	// Admin stays in English.
@@ -35,6 +36,11 @@
 		if (minutes < 60) return `${Math.round(minutes)} min ago`;
 		if (minutes < 60 * 24) return `${Math.round(minutes / 60)} h ago`;
 		return new Date(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+	}
+
+	function sourceLabel(url: string | null) {
+		const source = parseSource(url);
+		return source ? { url: source.url, label: source.publisher ? `${source.site} · ${source.publisher}` : source.site } : null;
 	}
 
 	const input =
@@ -127,6 +133,20 @@
 					</form>
 				{/snippet}
 
+				{#snippet sourceChip(url: string | null)}
+					{@const source = sourceLabel(url)}
+					{#if source}
+						<a
+							href={source.url}
+							target="_blank"
+							rel="noopener noreferrer nofollow"
+							class="inline-flex h-[26px] max-w-full items-center gap-[5px] rounded-sm border border-line-subtle bg-surface-raised px-[9px] text-caption font-bold text-fg-accent hover:bg-surface-raised-hover"
+						>
+							<ExternalLink size={14} strokeWidth={2.25} class="shrink-0" /><span class="truncate">{source.label}</span>
+						</a>
+					{/if}
+				{/snippet}
+
 				<!-- Mobile: cards -->
 				<ul class="flex flex-col gap-2 lg:hidden">
 					{#each rows as incident (incident.id)}
@@ -141,6 +161,7 @@
 									{#if isSeverity(incident.severity)}<SeverityBadge severity={incident.severity} />{/if}
 									{#if isStatus(incident.status)}<StatusBadge status={incident.status} />{/if}
 									{#if incident.hidden}<Badge icon={EyeOff}>Hidden</Badge>{/if}
+									{@render sourceChip(incident.source_url)}
 								</div>
 							</div>
 							{@render toggle(incident, 'self-center')}
@@ -161,6 +182,7 @@
 							<div class="min-w-0">
 								<p class="truncate font-bold">{incident.title}</p>
 								<p class="truncate text-caption text-fg-tertiary">{incident.address_hint || incident.description || ''}</p>
+								{#if incident.source_url}<div class="mt-1">{@render sourceChip(incident.source_url)}</div>{/if}
 							</div>
 							<span class="flex items-center gap-2 text-label font-normal"><CategoryTile {category} size={26} />{CATEGORY_LABEL[category]}</span>
 							<span>{#if isSeverity(incident.severity)}<SeverityBadge severity={incident.severity} />{/if}</span>
