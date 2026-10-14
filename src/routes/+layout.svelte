@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import { CircleAlert, CircleCheck, Download, Info, Share, Siren, SquarePlus, WifiOff, X } from 'lucide-svelte';
 	import { onMount } from 'svelte';
+	import SosCallDialog from '$lib/components/SosCallDialog.svelte';
 	import BrandMark from '$lib/components/ui/BrandMark.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import { initLocale, t } from '$lib/i18n/index.svelte';
@@ -167,3 +168,5 @@
 		</div>
 	{/each}
 </div>
+
+<SosCallDialog />

@@ -48,6 +48,9 @@ export function flyToIncident(lng: number, lat: number, incidentId: string | nul
 
 export type Theme = 'dark' | 'light';
 
+/** Shown after an SOS pin is on the map, so the reporter can dial emergency services. */
+export const sosCalls = $state({ open: false });
+
 /** Shared chrome state: theme, breakpoint, and whether a sheet covers the action bar. */
 export const chrome = $state<{ theme: Theme; desktop: boolean; sheetOpen: boolean }>({
 	theme: 'dark',

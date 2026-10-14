@@ -4,7 +4,7 @@
 	import { createIncident, currentPosition, RateLimitError } from '$lib/api';
 	import { t } from '$lib/i18n/index.svelte';
 	import { createSupabaseBrowserClient } from '$lib/supabaseClient';
-	import { flyToIncident, pushToast } from '$lib/ui.svelte';
+	import { flyToIncident, pushToast, sosCalls } from '$lib/ui.svelte';
 
 	const HOLD_MS = 1500;
 	const QUICK_MS = 400;
@@ -17,6 +17,8 @@
 	let frame = 0;
 	let started = 0;
 	let timer: ReturnType<typeof setTimeout> | undefined;
+	let fingerDown = false;
+	let callReady = false;
 
 	const label = $derived(
 		{
@@ -56,8 +58,16 @@
 		return cause instanceof Error ? cause.message : t('loc_denied');
 	}
 
+	function revealCalls() {
+		if (!callReady || fingerDown) return;
+		sosCalls.open = true;
+	}
+
 	function startHold(event: PointerEvent) {
 		if (phase === 'sending') return;
+		fingerDown = true;
+		callReady = false;
+		sosCalls.open = false;
 		try {
 			(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
 		} catch {
@@ -81,11 +91,16 @@
 	}
 
 	function endHold() {
-		if (phase !== 'holding') return;
-		cancelAnimationFrame(frame);
-		progress = 0;
-		if (performance.now() - started < QUICK_MS) settle('hint', 2400);
-		else phase = 'idle';
+		fingerDown = false;
+		if (phase === 'holding') {
+			cancelAnimationFrame(frame);
+			progress = 0;
+			if (performance.now() - started < QUICK_MS) settle('hint', 2400);
+			else phase = 'idle';
+			return;
+		}
+		// The hold already finished. Wait until the finger lifts so the release cannot dial.
+		revealCalls();
 	}
 
 	async function trigger() {
@@ -113,10 +128,8 @@
 				isSos: true
 			});
 			flyToIncident(lng, lat, id);
-			pushToast(t('sos_toast'), 'sos', {
-				title: t('sos_sent'),
-				action: { label: t('view'), run: () => flyToIncident(lng, lat, id) }
-			});
+			callReady = true;
+			revealCalls();
 			settle('sent', 3200);
 		} catch (cause) {
 			pushToast(locationMessage(cause), 'err');
