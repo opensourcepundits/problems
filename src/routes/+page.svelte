@@ -18,6 +18,7 @@
 	import EmergencySosButton from '$lib/components/EmergencySosButton.svelte';
 	import IncidentCard from '$lib/components/IncidentCard.svelte';
 	import MapPinView from '$lib/components/MapPinView.svelte';
+	import PlaceSearch from '$lib/components/PlaceSearch.svelte';
 	import ReportModal from '$lib/components/ReportModal.svelte';
 	import BrandMark from '$lib/components/ui/BrandMark.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
@@ -40,6 +41,7 @@
 		type TileBounds,
 		type Viewport
 	} from '$lib/types';
+	import type { PlaceHit } from '$lib/places';
 	import { chrome, mapCommand } from '$lib/ui.svelte';
 
 	let mode = $state<'pins' | 'grid'>('pins');
@@ -58,6 +60,10 @@
 	let draftPin = $state<{ lng: number; lat: number } | null>(null);
 	let pinBeforePick: { lng: number; lat: number } | null = null;
 	let pickPlaced = $state(false);
+	let flyNonce = $state(0);
+	let flyTarget = $state<PlaceHit | null>(null);
+	let pendingPlace = $state('');
+	let placeName = $state('');
 	let loading = $state(false);
 	let everLoaded = $state(false);
 	let error = $state('');
@@ -118,6 +124,8 @@
 	function openReport() {
 		draftPin = null;
 		pickingPin = false;
+		pendingPlace = '';
+		placeName = '';
 		selectedId = null;
 		reportOpen = true;
 	}
@@ -158,17 +166,28 @@
 	function startPick() {
 		pinBeforePick = draftPin;
 		pickPlaced = false;
+		pendingPlace = '';
 		mode = 'pins';
 		pickingPin = true;
 	}
 
 	function cancelPick() {
 		draftPin = pinBeforePick;
+		pendingPlace = '';
 		pickingPin = false;
 	}
 
 	function confirmPick() {
+		if (pendingPlace) placeName = pendingPlace.slice(0, 240);
 		pickingPin = false;
+	}
+
+	function choosePlace(place: PlaceHit) {
+		draftPin = { lng: place.lng, lat: place.lat };
+		pickPlaced = true;
+		pendingPlace = place.label;
+		flyTarget = place;
+		flyNonce += 1;
 	}
 
 	function toggleCategory(item: Category) {
@@ -314,6 +333,8 @@
 		{viewport}
 		{focusNonce}
 		{focusBounds}
+		{flyNonce}
+		{flyTarget}
 		picking={pickingPin}
 		{draftPin}
 		showZones={mode === 'grid'}
@@ -540,14 +561,17 @@
 
 {#if pickingPin}
 	<div
-		class="rise fixed inset-x-2 top-[calc(env(safe-area-inset-top)+8px)] z-40 flex items-center gap-2.5 rounded-lg border border-line-strong bg-surface-sheet py-2 pr-2 pl-3.5 shadow-pop lg:top-[76px] lg:right-auto lg:left-1/2 lg:min-w-[420px] lg:-translate-x-1/2"
+		class="rise fixed inset-x-2 top-[calc(env(safe-area-inset-top)+8px)] z-40 flex flex-col overflow-hidden rounded-lg border border-line-strong bg-surface-sheet shadow-pop lg:top-[76px] lg:right-auto lg:left-1/2 lg:w-[440px] lg:-translate-x-1/2"
 	>
-		<Crosshair size={20} class="shrink-0 text-fg-accent" />
-		<div class="min-w-0 flex-1">
-			<p class="text-[15px] font-bold">{pickPlaced ? t('pin_placed') : t('pick_title')}</p>
-			<p class="text-caption text-fg-tertiary">{pickPlaced ? t('tap_move') : t('pick_sub')}</p>
+		<PlaceSearch bias={{ lng: viewport.center[0], lat: viewport.center[1] }} onChoose={choosePlace} />
+		<div class="flex items-center gap-2.5 py-2 pr-2 pl-3.5">
+			<Crosshair size={20} class="shrink-0 text-fg-accent" />
+			<div class="min-w-0 flex-1">
+				<p class="text-[15px] font-bold">{pickPlaced ? t('pin_placed') : t('pick_title')}</p>
+				<p class="text-caption text-fg-tertiary">{pickPlaced ? t('tap_move') : t('pick_sub')}</p>
+			</div>
+			<Button variant="ghost" onclick={cancelPick}>{t('cancel')}</Button>
 		</div>
-		<Button variant="ghost" onclick={cancelPick}>{t('cancel')}</Button>
 	</div>
 	{#if pickPlaced}
 		<div class="rise fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-40 flex justify-center lg:bottom-6">
@@ -561,10 +585,13 @@
 		picking={pickingPin}
 		lat={draftPin?.lat ?? null}
 		lng={draftPin?.lng ?? null}
+		{placeName}
 		onClose={() => {
 			reportOpen = false;
 			pickingPin = false;
 			draftPin = null;
+			placeName = '';
+			pendingPlace = '';
 		}}
 		{onCreated}
 		onDropPin={startPick}

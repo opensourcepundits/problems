@@ -19,6 +19,8 @@
 		viewport,
 		focusNonce = 0,
 		focusBounds = null,
+		flyNonce = 0,
+		flyTarget = null,
 		picking = false,
 		draftPin = null,
 		showZones = false,
@@ -36,6 +38,13 @@
 		viewport: Viewport;
 		focusNonce?: number;
 		focusBounds?: [[number, number], [number, number]] | null;
+		flyNonce?: number;
+		flyTarget?: {
+			lng: number;
+			lat: number;
+			zoom: number;
+			bounds: [[number, number], [number, number]] | null;
+		} | null;
 		picking?: boolean;
 		draftPin?: { lng: number; lat: number } | null;
 		showZones?: boolean;
@@ -56,6 +65,7 @@
 	let loadedTheme: MapTheme | null = null;
 	let applying = false;
 	let seenFocus = 0;
+	let seenFly = 0;
 	let popup: Popup | undefined;
 	let hoverPopup: Popup | undefined;
 	let hoverZone: number | null = null;
@@ -636,6 +646,20 @@
 		if (!ready || !map || !bounds || nonce === 0 || nonce === seenFocus) return;
 		seenFocus = nonce;
 		map.fitBounds(bounds, { padding: fitPadding(), maxZoom: 13 });
+	});
+
+	$effect(() => {
+		const nonce = flyNonce;
+		const target = flyTarget;
+		if (!ready || !map || !target || nonce === 0 || nonce === seenFly) return;
+		seenFly = nonce;
+		const duration = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 800;
+		// Keep the searched place clear of the search bar and the confirm button.
+		const padding = chrome.desktop
+			? { top: 180, bottom: 120, left: 48, right: 48 }
+			: { top: 220, bottom: 160, left: 28, right: 28 };
+		if (target.bounds) map.fitBounds(target.bounds, { padding, maxZoom: target.zoom, duration });
+		else map.flyTo({ center: [target.lng, target.lat], zoom: target.zoom, duration });
 	});
 </script>
 

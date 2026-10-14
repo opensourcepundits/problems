@@ -22,6 +22,7 @@
 		picking,
 		lat,
 		lng,
+		placeName = '',
 		onClose,
 		onCreated,
 		onDropPin,
@@ -30,6 +31,7 @@
 		picking: boolean;
 		lat: number | null;
 		lng: number | null;
+		placeName?: string;
 		onClose: () => void;
 		onCreated: (id: string, lng: number, lat: number) => void;
 		onDropPin: () => void;
@@ -41,6 +43,7 @@
 	let category = $state<Category | null>(null);
 	let severity = $state<Severity>('medium');
 	let addressHint = $state('');
+	let addressTouched = $state(false);
 	let sourceText = $state('');
 	let sourceTouched = $state(false);
 	let phase = $state<'editing' | 'submitting' | 'success' | 'error'>('editing');
@@ -66,6 +69,12 @@
 	// Accuracy only applies while the pin is still the GPS fix; a dropped pin has none.
 	const accuracy = $derived(gps && gps.lat === lat && gps.lng === lng ? gps.accuracy : null);
 	const pickable = CATEGORIES.filter((item) => item !== 'sos');
+
+	// A searched place fills the landmark until the person types their own.
+	$effect(() => {
+		const next = placeName.trim();
+		if (!addressTouched && next) addressHint = next.slice(0, 240);
+	});
 
 	onDestroy(() => {
 		for (const preview of previews) URL.revokeObjectURL(preview.url);
@@ -376,6 +385,7 @@
 					bind:value={addressHint}
 					maxlength="240"
 					placeholder={t('landmark_ph')}
+					oninput={() => (addressTouched = true)}
 				/>
 			{/snippet}
 			{@render field(t('landmark'), true, '', '', landmark)}
