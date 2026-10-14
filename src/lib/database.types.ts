@@ -34,6 +34,7 @@ export type Database = {
 					media_urls: string[];
 					status: Database['public']['Enums']['incident_status'];
 					is_sos: boolean;
+					hidden: boolean;
 					created_at: string;
 					updated_at: string;
 				};
@@ -48,6 +49,7 @@ export type Database = {
 					media_urls?: string[];
 					status?: Database['public']['Enums']['incident_status'];
 					is_sos?: boolean;
+					hidden?: boolean;
 					created_at?: string;
 					updated_at?: string;
 				};
@@ -59,6 +61,7 @@ export type Database = {
 					address_hint?: string | null;
 					media_urls?: string[];
 					status?: Database['public']['Enums']['incident_status'];
+					hidden?: boolean;
 				};
 				Relationships: [];
 			};

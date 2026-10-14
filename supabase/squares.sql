@@ -38,6 +38,7 @@ begin
     from public.incidents
     where created_at >= now() - make_interval(hours => least(greatest(coalesce(hours_back, 24), 1), 720))
       and status <> 'debunked'
+      and hidden = false
       and (
         categories is null
         or cardinality(categories) = 0

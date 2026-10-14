@@ -120,6 +120,7 @@ as $$
   from public.incidents i
   left join public.profiles p on p.id = i.user_id
   where i.created_at >= now() - make_interval(hours => least(greatest(coalesce(hours_back, 168), 1), 2160))
+    and i.hidden = false
     and (i.status <> 'debunked' or i.user_id = auth.uid())
     and (
       categories is null
@@ -176,6 +177,7 @@ begin
     from public.incidents
     where created_at >= now() - make_interval(hours => least(greatest(coalesce(hours_back, 24), 1), 720))
       and status <> 'debunked'
+      and hidden = false
       and (
         categories is null
         or cardinality(categories) = 0

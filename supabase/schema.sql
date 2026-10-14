@@ -65,6 +65,7 @@ create table if not exists public.incidents (
   media_urls text[] not null default '{}',
   status public.incident_status not null default 'unverified',
   is_sos boolean not null default false,
+  hidden boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint incidents_title_len check (char_length(title) between 1 and 160),
@@ -95,6 +96,7 @@ create table if not exists public.incident_confirmations (
 );
 
 alter table public.incidents alter column user_id drop not null;
+alter table public.incidents add column if not exists hidden boolean not null default false;
 alter table public.incident_comments alter column user_id drop not null;
 alter table public.incident_confirmations alter column user_id drop not null;
 alter table public.incident_confirmations add column if not exists voter_key text;
@@ -129,6 +131,7 @@ create index if not exists incidents_geom_3857_gix on public.incidents using gis
 create index if not exists incidents_created_at_idx on public.incidents (created_at desc);
 create index if not exists incidents_category_idx on public.incidents (category);
 create index if not exists incidents_status_idx on public.incidents (status);
+create index if not exists incidents_hidden_idx on public.incidents (hidden) where hidden;
 create index if not exists incidents_user_idx on public.incidents (user_id);
 create index if not exists incidents_sos_idx on public.incidents (created_at desc) where is_sos;
 create index if not exists incident_comments_incident_idx on public.incident_comments (incident_id, created_at);
@@ -655,6 +658,7 @@ as $$
   from public.incidents i
   left join public.profiles p on p.id = i.user_id
   where i.created_at >= now() - make_interval(hours => least(greatest(coalesce(hours_back, 168), 1), 2160))
+    and i.hidden = false
     and (i.status <> 'debunked' or i.user_id = auth.uid())
     and (
       categories is null
@@ -711,6 +715,7 @@ begin
     from public.incidents
     where created_at >= now() - make_interval(hours => least(greatest(coalesce(hours_back, 24), 1), 720))
       and status <> 'debunked'
+      and hidden = false
       and (
         categories is null
         or cardinality(categories) = 0
@@ -797,7 +802,7 @@ create policy profiles_update_own on public.profiles
 drop policy if exists incidents_select_public on public.incidents;
 create policy incidents_select_public on public.incidents
   for select to anon, authenticated
-  using (status <> 'debunked' or user_id = auth.uid());
+  using (hidden = false and (status <> 'debunked' or user_id = auth.uid()));
 
 drop policy if exists incidents_insert_own on public.incidents;
 create policy incidents_insert_own on public.incidents
