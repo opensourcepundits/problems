@@ -155,6 +155,7 @@ export type Database = {
 					p_address_hint?: string | null;
 					p_media_urls?: string[];
 					p_is_sos?: boolean;
+					p_client_key?: string | null;
 				};
 				Returns: string;
 			};

@@ -19,7 +19,7 @@ export default defineConfig({
 		SvelteKitPWA({
 			registerType: 'autoUpdate',
 			manifest,
-			includeAssets: ['favicon.svg', 'pwa-192.png', 'pwa-512.png'],
+			includeAssets: ['favicon.svg', 'pwa-192.png', 'pwa-512.png', 'pwa-maskable-512.png', 'fonts/*.woff2'],
 			workbox: {
 				runtimeCaching: [
 					{
@@ -32,11 +32,20 @@ export default defineConfig({
 						}
 					},
 					{
-						urlPattern: /^https:\/\/tile\.openstreetmap\.org\/.*/i,
+						urlPattern: /^https:\/\/tiles\.openfreemap\.org\/styles\/.*/i,
+						handler: 'StaleWhileRevalidate',
+						options: {
+							cacheName: 'map-styles',
+							expiration: { maxEntries: 8, maxAgeSeconds: 60 * 60 * 24 * 14 },
+							cacheableResponse: { statuses: [0, 200] }
+						}
+					},
+					{
+						urlPattern: /^https:\/\/(tiles\.openfreemap\.org|server\.arcgisonline\.com)\/.*/i,
 						handler: 'CacheFirst',
 						options: {
-							cacheName: 'osm-tiles',
-							expiration: { maxEntries: 800, maxAgeSeconds: 60 * 60 * 24 * 14 },
+							cacheName: 'map-tiles',
+							expiration: { maxEntries: 1200, maxAgeSeconds: 60 * 60 * 24 * 14 },
 							cacheableResponse: { statuses: [0, 200] }
 						}
 					},

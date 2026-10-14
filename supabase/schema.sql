@@ -934,6 +934,9 @@ end $$;
 
 notify pgrst, 'reload schema';
 
+-- Follow-up files, run in order after this one: anonymous.sql, admin.sql, squares.sql, zones.sql, rate_limits.sql.
+-- rate_limits.sql replaces create_incident with a version that takes p_client_key.
+
 -- Promote an operator in the SQL editor (users cannot set app_metadata themselves):
 -- update auth.users
 -- set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || '{"role":"admin"}'::jsonb

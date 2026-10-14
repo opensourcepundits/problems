@@ -78,22 +78,7 @@ export type GridFeatureCollection = {
 	}>;
 };
 
-export const CATEGORY_LABEL: Record<Category, string> = {
-	fire: 'Fire',
-	looting: 'Looting',
-	casualty: 'Casualty',
-	accident: 'Accident',
-	roadblock: 'Roadblock',
-	sos: 'SOS',
-	other: 'Other'
-};
-
-export const SEVERITY_COLOR: Record<Severity, string> = {
-	low: '#38bdf8',
-	medium: '#facc15',
-	high: '#f97316',
-	critical: '#dc2626'
-};
+export { CATEGORY_LABEL, SEVERITY_COLOR } from '$lib/tokens';
 
 export const TIME_WINDOWS = [
 	{ hours: 6, label: '6h' },

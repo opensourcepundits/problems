@@ -100,7 +100,7 @@ export async function createIncident(
 		isSos: boolean;
 	}
 ): Promise<string> {
-	const { data, error } = await supabase.rpc('create_incident', {
+	const args = {
 		p_title: input.title,
 		p_description: input.description,
 		p_category: input.category,
@@ -110,9 +110,30 @@ export async function createIncident(
 		p_address_hint: input.addressHint,
 		p_media_urls: input.mediaUrls,
 		p_is_sos: input.isSos
-	});
+	};
+	let { data, error } = await supabase.rpc('create_incident', { ...args, p_client_key: voterKey() });
+	// Before supabase/rate_limits.sql is applied the RPC has no p_client_key parameter.
+	if (error?.code === 'PGRST202') ({ data, error } = await supabase.rpc('create_incident', args));
+	const limited = error ? rateLimit(error.message) : null;
+	if (limited) throw limited;
 	if (error || !data) throw new Error(message(error, 'Could not save the incident.'));
 	return data;
+}
+
+/** Thrown when the database refuses an insert with `rate_limited:<kind>:<seconds>`. */
+export class RateLimitError extends Error {
+	constructor(
+		readonly kind: 'sos' | 'report',
+		readonly retryAfterSeconds: number
+	) {
+		super(`rate_limited:${kind}:${retryAfterSeconds}`);
+		this.name = 'RateLimitError';
+	}
+}
+
+function rateLimit(text: string): RateLimitError | null {
+	const match = /rate_limited:(sos|report):(\d+)/.exec(text);
+	return match ? new RateLimitError(match[1] as 'sos' | 'report', Number(match[2])) : null;
 }
 
 function voterKey() {

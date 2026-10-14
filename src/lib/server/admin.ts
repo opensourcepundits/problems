@@ -17,6 +17,10 @@ export type AdminIncident = {
 	status: string;
 	hidden: boolean;
 	created_at: string;
+	address_hint: string | null;
+	is_sos: boolean;
+	confirm_count: number;
+	deny_count: number;
 };
 
 function digest(value: string) {
@@ -102,13 +106,23 @@ function adminClient(): SupabaseClient<Database> | null {
 export async function listIncidents(): Promise<AdminIncident[]> {
 	const supabase = adminClient();
 	if (!supabase) throw new Error('Admin database access is not configured.');
+	// The generated types carry no relationships, so the embedded vote rows are typed by hand.
 	const { data, error } = await supabase
 		.from('incidents')
-		.select('id, title, description, category, severity, status, hidden, created_at')
+		.select(
+			'id, title, description, category, severity, status, hidden, created_at, address_hint, is_sos, incident_confirmations(vote_type)'
+		)
 		.order('created_at', { ascending: false })
 		.limit(500);
 	if (error) throw new Error(error.message);
-	return data ?? [];
+	type Row = Omit<AdminIncident, 'confirm_count' | 'deny_count'> & {
+		incident_confirmations: { vote_type: string }[] | null;
+	};
+	return ((data ?? []) as unknown as Row[]).map(({ incident_confirmations: votes, ...row }) => ({
+		...row,
+		confirm_count: votes?.filter((item) => item.vote_type === 'confirm').length ?? 0,
+		deny_count: votes?.filter((item) => item.vote_type === 'deny').length ?? 0
+	}));
 }
 
 export async function setIncidentHidden(id: string, hidden: boolean) {

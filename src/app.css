@@ -1,67 +1,179 @@
+/* Crisis Report — Lantern design language (Tailwind v4, CSS-first). */
 @import 'tailwindcss';
 
-@theme {
-	--font-sans: 'Segoe UI', ui-sans-serif, system-ui, sans-serif;
+@font-face{font-family:'Atkinson Hyperlegible Next';font-style:normal;font-weight:400 800;font-display:swap;src:url('/fonts/AtkinsonHyperlegibleNext-latin-ext.woff2') format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Atkinson Hyperlegible Next';font-style:normal;font-weight:400 800;font-display:swap;src:url('/fonts/AtkinsonHyperlegibleNext-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Atkinson Hyperlegible Mono';font-style:normal;font-weight:400 700;font-display:swap;src:url('/fonts/AtkinsonHyperlegibleMono-latin-ext.woff2') format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Atkinson Hyperlegible Mono';font-style:normal;font-weight:400 700;font-display:swap;src:url('/fonts/AtkinsonHyperlegibleMono-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+
+
+/* 1 · Raw scales → Tailwind utilities (bg-ink-150, text-cat-fire, rounded-md, font-mono, text-title-lg …) */
+@theme static {
+  --color-*: initial;
+  /* Ink — cool neutral ramp (hue ~250) */
+  --color-ink-0:#07090c;--color-ink-50:#0c1015;--color-ink-100:#12171e;--color-ink-150:#171d25;--color-ink-200:#1e252f;--color-ink-250:#262e3a;--color-ink-300:#313a47;--color-ink-400:#4a5463;--color-ink-500:#6b7585;--color-ink-600:#8c96a5;--color-ink-700:#b1b9c5;--color-ink-800:#d5dae1;--color-ink-900:#eef1f5;--color-white:#ffffff;
+  /* Beacon — the one interactive accent (selection, focus, Report, Post) */
+  --color-beacon-200:#c6dfff;--color-beacon-300:#9cc8ff;--color-beacon-400:#6aaeff;--color-beacon-500:#3d8ff0;--color-beacon-600:#1f6fd6;--color-beacon-900:#12305a;--color-beacon-950:#0d2340;
+  /* Alarm red — SOS and critical ONLY */
+  --color-alarm-300:#ffa3a3;--color-alarm-400:#ff6b6b;--color-alarm-500:#ff4d4d;--color-alarm-600:#dc2626;--color-alarm-700:#b91c1c;--color-alarm-950:#3a0d0f;
+  /* Semantic */
+  --color-success-400:#3ecf8e;--color-success-950:#0d2e20;
+  --color-warning-400:#f5b83d;--color-warning-950:#3a2a0c;
+  --color-info-400:var(--color-beacon-400);--color-info-950:var(--color-beacon-950);
+  --color-danger-400:var(--color-alarm-400);--color-danger-950:var(--color-alarm-950);
+  
+  /* Categories — marker fills (glyph is ink-0 except SOS) */
+  --color-cat-fire:#ff8a3d;--color-cat-looting:#b48cff;--color-cat-casualty:#ff6fa8;--color-cat-accident:#3fd0c9;--color-cat-roadblock:#f2c94c;--color-cat-sos:#dc2626;--color-cat-other:#9aa4b2;
+  --color-cat-glyph:#07090c;
+  /* Severity — 4 steps */
+  --color-sev-low:#7fb2d9;--color-sev-medium:#f5b83d;--color-sev-high:#ff7a3d;--color-sev-critical:#ff4d4d;
+  /* Status */
+  --color-status-unverified:#b1b9c5;--color-status-verified:#3ecf8e;--color-status-resolved:#8c96a5;--color-status-debunked:#6b7585;
+  /* Zone heat ("ember"), fills carry their own alpha so the basemap reads through */
+  --color-heat-0:rgba(255,255,255,0);--color-heat-1:rgba(245,184,61,.20);--color-heat-3:rgba(245,160,50,.32);--color-heat-8:rgba(255,122,61,.44);--color-heat-20:rgba(255,77,77,.54);--color-heat-50:rgba(226,48,110,.64);
+  --color-heat-line-empty:rgba(255,255,255,.05);--color-heat-line:rgba(255,184,120,.55);
+  --heat-legend:linear-gradient(90deg,rgba(245,184,61,.35),rgba(255,122,61,.6),rgba(255,77,77,.75),rgba(226,48,110,.85)); /* @kind color */
+  
+  
+  --font-sans:'Atkinson Hyperlegible Next',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-mono:'Atkinson Hyperlegible Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  
+  /* Scale (mobile-first; body never below 16 so iOS Safari does not zoom inputs) */
+  --text-display:30px;--text-display--line-height:36px;
+  --text-title-lg:22px;--text-title-lg--line-height:28px;
+  --text-title:18px;--text-title--line-height:24px;
+  --text-body:16px;--text-body--line-height:24px;
+  --text-body-sm:15px;--text-body-sm--line-height:22px;
+  --text-label:14px;--text-label--line-height:20px;
+  --text-caption:13px;--text-caption--line-height:18px;
+  --text-micro:12px;--text-micro--line-height:16px;
+  
+  --font-weight-regular:400;--font-weight-medium:500;--font-weight-semibold:600;--font-weight-bold:700;--font-weight-heavy:800;
+  --tracking-tight:-0.01em;
+  --tracking-normal:0;
+  --tracking-caps:0.06em; /* micro uppercase labels */
+  --font-numeric:tabular-nums; /* @kind font */
+  --radius-xs:6px;--radius-sm:8px;--radius-md:12px;--radius-lg:16px;--radius-xl:20px;
+  --shadow-overlay:0 1px 0 rgba(255,255,255,.04) inset,0 6px 20px rgba(0,0,0,.35);
+  --shadow-sheet:0 -12px 40px rgba(0,0,0,.45);
+  --shadow-pop:0 14px 36px rgba(0,0,0,.50);
+  --shadow-sos:0 8px 24px rgba(220,38,38,.40);
+  --blur-overlay:14px;
+  --ease-out:cubic-bezier(.16,1,.3,1);--ease-standard:cubic-bezier(.2,0,0,1);--ease-sheet:cubic-bezier(.2,.8,.2,1);
+  --breakpoint-lg:64rem;
 }
 
-html,
-body {
-	height: 100%;
+/* 2 · Semantic, theme-switchable aliases → utilities (bg-surface-sheet, text-fg-secondary, border-line-subtle, bg-accent …) */
+:root{
+--surface-canvas:var(--color-ink-50);
+--surface-overlay:rgba(18,23,30,.88);
+--surface-sheet:var(--color-ink-150);
+--surface-raised:var(--color-ink-200);
+--surface-raised-hover:var(--color-ink-250);
+--surface-input:#0e1218;
+--surface-inverse:var(--color-ink-900);
+--scrim:rgba(7,9,12,.56);
+
+--text-primary:var(--color-ink-900);
+--text-secondary:var(--color-ink-700);
+--text-tertiary:var(--color-ink-600);
+--text-disabled:var(--color-ink-500);
+--text-inverse:var(--color-ink-0);
+--text-on-accent:var(--color-ink-0);
+--text-on-alarm:var(--color-white);
+--text-accent:var(--color-beacon-300);
+
+--border-subtle:rgba(255,255,255,.08);
+--border-strong:rgba(255,255,255,.14);
+--border-input:var(--color-ink-300);
+--border-focus:var(--color-beacon-400);
+
+--accent:var(--color-beacon-400);
+--accent-hover:var(--color-beacon-300);
+--accent-pressed:var(--color-beacon-500);
+--accent-tint:rgba(106,174,255,.14);
+--accent-tint-strong:rgba(106,174,255,.24);
+--alarm:var(--color-alarm-600);
+--alarm-strong:var(--color-alarm-700);
+--alarm-tint:rgba(220,38,38,.16);
+
+--map-bg:#0e1116;
+--action-fade:rgba(12,16,21,.78);
+}
+[data-theme="light"]{
+--surface-canvas:#f3f5f8;
+--surface-overlay:rgba(255,255,255,.92);
+--surface-sheet:#ffffff;
+--surface-raised:#eef1f5;
+--surface-raised-hover:#e3e8ee;
+--surface-input:#ffffff;
+--surface-inverse:#12171e;
+--scrim:rgba(12,16,21,.40);
+--text-primary:#0e1318;
+--text-secondary:#3f4a58;
+--text-tertiary:#5f6a7a;
+--text-disabled:#9aa4b2;
+--text-inverse:#ffffff;
+--text-on-accent:#ffffff;
+--text-accent:#1f6fd6;
+--border-subtle:rgba(12,16,21,.08);
+--border-strong:rgba(12,16,21,.16);
+--border-input:#c9d0d9;
+--border-focus:#1f6fd6;
+--accent:#1f6fd6;
+--accent-hover:#1a62bf;
+--accent-pressed:#1653a3;
+--accent-tint:rgba(31,111,214,.10);
+--accent-tint-strong:rgba(31,111,214,.18);
+--alarm-tint:rgba(220,38,38,.10);
+--color-status-unverified:#5f6a7a;
+--color-status-verified:#12895a;
+--color-status-resolved:#6b7585;
+--color-status-debunked:#9aa4b2;
+--color-sev-low:#3f7fb0;--color-sev-medium:#b7790a;--color-sev-high:#d4561a;--color-sev-critical:#d42424;
+--map-bg:#e9edf1;
+--action-fade:rgba(243,245,248,.85);
+}
+@theme inline {
+  --color-surface-canvas:var(--surface-canvas);--color-surface-overlay:var(--surface-overlay);--color-surface-sheet:var(--surface-sheet);
+  --color-surface-raised:var(--surface-raised);--color-surface-raised-hover:var(--surface-raised-hover);--color-surface-input:var(--surface-input);
+  --color-fg:var(--text-primary);--color-fg-secondary:var(--text-secondary);--color-fg-tertiary:var(--text-tertiary);--color-fg-on-accent:var(--text-on-accent);--color-fg-accent:var(--text-accent);
+  --color-line-subtle:var(--border-subtle);--color-line-strong:var(--border-strong);--color-line-input:var(--border-input);
+  --color-accent:var(--accent);--color-accent-hover:var(--accent-hover);--color-accent-tint:var(--accent-tint);--color-alarm:var(--alarm);--color-map-bg:var(--map-bg);
 }
 
-body {
-	margin: 0;
-	background: #0b1220;
-	color: #e8eef9;
-	font-family: var(--font-sans);
-	-webkit-font-smoothing: antialiased;
-}
+/* 3 · Base */
+html,body{height:100%}
+body{margin:0;background:var(--surface-canvas);color:var(--text-primary);font-family:var(--font-sans);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+input,select,textarea{font-size:16px} /* stops iOS Safari zoom-on-focus */
+:focus-visible{outline:2px solid var(--border-focus);outline-offset:2px}
+.num{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
 
-.maplibregl-ctrl-attrib {
-	background: rgba(11, 18, 32, 0.8) !important;
-	color: #cbd5e1 !important;
-}
+/* 4 · MapLibre chrome */
+.maplibregl-ctrl-attrib{background:var(--surface-overlay)!important;color:var(--text-tertiary)!important;font:11px/16px var(--font-sans)!important;border-radius:6px 0 0 0}
+.maplibregl-ctrl-attrib a{color:inherit!important}
+.crisis-popup{z-index:16}
+.crisis-popup .maplibregl-popup-content{background:var(--surface-sheet);color:var(--text-primary);border:1px solid var(--border-strong);border-radius:14px;padding:14px;box-shadow:var(--shadow-pop);font-family:var(--font-sans)}
+.crisis-popup .maplibregl-popup-close-button{width:32px;height:32px;top:6px;right:6px;border-radius:8px;color:var(--text-tertiary);font-size:20px}
+.crisis-popup .maplibregl-popup-tip{border-top-color:var(--surface-sheet)!important;border-bottom-color:var(--surface-sheet)!important}
+@media (max-width:1023.98px){.lantern-map .maplibregl-ctrl-bottom-left{bottom:calc(84px + env(safe-area-inset-bottom))}}
+.maplibregl-ctrl-attrib.maplibregl-compact{min-height:24px}
+/* Default nav control is removed; zoom/locate are Svelte buttons (see IMPLEMENTATION.md) */
 
-.maplibregl-ctrl-attrib a {
-	color: #fecaca !important;
-}
-
-.crisis-popup .maplibregl-popup-content {
-	background: #111827;
-	color: #e8eef9;
-	border-radius: 14px;
-	padding: 12px 14px;
-	box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
-}
-
-.crisis-popup .maplibregl-popup-close-button {
-	color: #e8eef9;
-	font-size: 18px;
-	padding: 4px 8px;
-}
-
-.crisis-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
-.crisis-popup.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
-.crisis-popup.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
-	border-top-color: #111827;
-}
-
-.crisis-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip,
-.crisis-popup.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
-.crisis-popup.maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
-	border-bottom-color: #111827;
-}
-
-.crisis-popup.maplibregl-popup-anchor-left .maplibregl-popup-tip {
-	border-right-color: #111827;
-}
-
-.crisis-popup.maplibregl-popup-anchor-right .maplibregl-popup-tip {
-	border-left-color: #111827;
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.sos-pulse {
-		animation: none !important;
-	}
-}
+/* 5 · Motion */
+@keyframes sos-halo{0%{transform:scale(.9);opacity:.55}100%{transform:scale(1.9);opacity:0}}
+@keyframes shimmer{0%{background-position:-200px 0}100%{background-position:200px 0}}
+@keyframes live{0%,100%{opacity:1}50%{opacity:.35}}
+.sos-halo{animation:sos-halo 1.6s var(--ease-out) infinite}
+.shimmer{background-image:linear-gradient(90deg,transparent,rgba(255,255,255,.06),transparent);background-size:200px 100%;background-repeat:no-repeat;animation:shimmer 1.4s linear infinite}
+.live-dot{animation:live 2s ease-in-out infinite}
+@keyframes spin-slow{to{transform:rotate(360deg)}}
+.spin{animation:spin-slow .9s linear infinite}
+@keyframes rise{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+.rise{animation:rise 200ms var(--ease-out)}
+.noscroll{scrollbar-width:none}.noscroll::-webkit-scrollbar{display:none}
+.glass{background:var(--surface-overlay);border:1px solid var(--border-subtle);box-shadow:var(--shadow-overlay);-webkit-backdrop-filter:blur(14px) saturate(1.2);backdrop-filter:blur(14px) saturate(1.2)}
+.press{transition:background-color 120ms var(--ease-standard),transform 120ms var(--ease-standard),border-color 120ms}
+.press:not(:disabled):active{transform:scale(.98)}
+.chip-rail{-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 8px,#000 calc(100% - 20px),transparent 100%);mask-image:linear-gradient(90deg,transparent 0,#000 8px,#000 calc(100% - 20px),transparent 100%)}
+@media (prefers-reduced-motion:reduce){*,::before,::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}}

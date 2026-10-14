@@ -82,6 +82,7 @@ export function squareGrid(incidents: Incident[], cellKm: number): SquareFeature
 			}
 			features.push({
 				type: 'Feature',
+				id: i * rows + j,
 				geometry: { type: 'Polygon', coordinates: [[sw, se, ne, nw, sw]] },
 				properties: {
 					total_count: bin?.total ?? 0,
