@@ -30,9 +30,13 @@ function isVendorChunk(fileName: string, chunk: OutputChunk) {
 	return ids.length > 0 && ids.every((id) => id.includes('node_modules'));
 }
 
+// Vercel sets this to the git branch. Staging stays readable for debugging.
+const skipObfuscation = process.env.VERCEL_GIT_COMMIT_REF === 'staging';
+
 // The plugin splits vendor code out of the client build, but SvelteKit does not
 // emit the index.html hook it uses to obfuscate. Run the same options on the client chunks.
 function clientObfuscator(): Plugin {
+	if (skipObfuscation) return { name: 'client-obfuscator-disabled' };
 	const plugin = vitePluginBundleObfuscator({
 		apply: (_config, env) => env.command === 'build' && !env.isSsrBuild,
 		autoExcludeNodeModules: true,
