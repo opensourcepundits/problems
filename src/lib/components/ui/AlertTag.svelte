@@ -1,46 +1,30 @@
 <script lang="ts" module>
+	const HOLD_MS = 4000;
+
 	let collapsed = $state(false);
 	let remembered = '';
 	let timer: ReturnType<typeof setTimeout> | undefined;
 
-	function storageKey(message: string, severity: string) {
-		return `cr-alert:${severity}:${message}`;
-	}
-
-	function write(message: string, severity: string) {
-		try {
-			sessionStorage.setItem(storageKey(message, severity), collapsed ? '1' : '0');
-		} catch {
-			// non-fatal
-		}
-	}
-
-	function arm(message: string, severity: string) {
+	function arm() {
 		clearTimeout(timer);
 		timer = setTimeout(() => {
 			collapsed = true;
-			write(message, severity);
-		}, 6500);
+		}, HOLD_MS);
 	}
 
-	/** Shared by the mobile and desktop copies so they fold together. */
-	function sync(message: string, severity: string) {
-		const key = storageKey(message, severity);
+	/** Show the full notice, then fold it. Shared so the mobile and desktop copies move together. */
+	function present(message: string, severity: string) {
+		const key = `${severity}:${message}`;
 		if (remembered === key) return;
 		remembered = key;
-		clearTimeout(timer);
-		try {
-			collapsed = sessionStorage.getItem(key) === '1';
-		} catch {
-			collapsed = false;
-		}
-		if (!collapsed) arm(message, severity);
+		collapsed = false;
+		arm();
 	}
 
-	function toggleShared(message: string, severity: string) {
+	function toggleShared() {
 		clearTimeout(timer);
 		collapsed = !collapsed;
-		write(message, severity);
+		if (!collapsed) arm();
 	}
 </script>
 
@@ -68,7 +52,7 @@
 
 	$effect(() => {
 		if (preview) return;
-		sync(message, severity);
+		present(message, severity);
 	});
 
 	function toggle() {
@@ -76,7 +60,7 @@
 			previewCollapsed = !previewCollapsed;
 			return;
 		}
-		toggleShared(message, severity);
+		toggleShared();
 	}
 </script>
 
