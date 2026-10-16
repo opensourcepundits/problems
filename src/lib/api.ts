@@ -9,6 +9,7 @@ import {
 	type Incident,
 	type IncidentComment,
 	type Severity,
+	type SiteAlert,
 	type TileBounds,
 	type VoteType
 } from '$lib/types';
@@ -44,6 +45,31 @@ function asIncident(row: Database['public']['Functions']['get_incidents']['Retur
 		author_name: row.author_name,
 		source_url: row.source_url ?? null
 	};
+}
+
+function asSiteAlert(row: {
+	active: boolean;
+	message: string;
+	severity: string;
+} | null): SiteAlert | null {
+	if (!row || !isSeverity(row.severity)) return null;
+	const message = row.message.trim();
+	if (!message) return null;
+	return { active: row.active, message, severity: row.severity };
+}
+
+/** The public map notice. Null when the table has not been created yet. */
+export async function fetchSiteAlert(supabase: Client): Promise<SiteAlert | null> {
+	const { data, error } = await supabase
+		.from('site_alerts')
+		.select('active, message, severity')
+		.eq('id', 1)
+		.maybeSingle();
+	if (error) {
+		if (error.code === 'PGRST205' || error.code === '42P01') return null;
+		throw new Error(message(error, 'Could not load the notice.'));
+	}
+	return asSiteAlert(data);
 }
 
 export async function fetchIncidents(

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { ExternalLink, Eye, EyeOff, Lock, LogOut } from 'lucide-svelte';
+	import AlertTag from '$lib/components/ui/AlertTag.svelte';
 	import AppHeader from '$lib/components/ui/AppHeader.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
@@ -7,14 +8,40 @@
 	import Notice from '$lib/components/ui/Notice.svelte';
 	import SegmentedControl from '$lib/components/ui/SegmentedControl.svelte';
 	import SeverityBadge from '$lib/components/ui/SeverityBadge.svelte';
+	import SeverityMeter from '$lib/components/ui/SeverityMeter.svelte';
 	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
 	import { parseSource } from '$lib/sources';
-	import { CATEGORY_LABEL, isCategory, isSeverity, isStatus, type Category } from '$lib/types';
+	import { SEVERITY_META } from '$lib/tokens';
+	import {
+		CATEGORY_LABEL,
+		isCategory,
+		isSeverity,
+		isStatus,
+		SEVERITIES,
+		SITE_ALERT_MAX,
+		type Category,
+		type Severity
+	} from '$lib/types';
 
 	// Admin stays in English.
 	let { data, form } = $props();
 	let show = $state<'all' | 'visible' | 'hidden'>('all');
 	let query = $state('');
+	let noticeOn = $state(false);
+	let noticeMessage = $state('Curfew in progress');
+	let noticeSeverity = $state<Severity>('high');
+	let appliedNotice = '';
+
+	$effect(() => {
+		const alert = data.alert;
+		if (!alert) return;
+		const key = `${alert.active}\0${alert.severity}\0${alert.message}`;
+		if (key === appliedNotice) return;
+		appliedNotice = key;
+		noticeOn = alert.active;
+		noticeMessage = alert.message;
+		noticeSeverity = alert.severity;
+	});
 
 	const hiddenCount = $derived(data.incidents.filter((incident) => incident.hidden).length);
 	const rows = $derived(
@@ -99,6 +126,77 @@
 			</div>
 		{:else}
 			<div class="mx-auto flex max-w-[720px] flex-col gap-3.5 px-3 pt-4 pb-8 lg:max-w-[1120px] lg:px-6 lg:pt-6 lg:pb-10">
+				<section class="rounded-lg border border-line-subtle bg-surface-sheet p-4">
+					<div class="flex flex-wrap items-start justify-between gap-3">
+						<div class="min-w-0">
+							<h2 class="text-title-lg font-heavy">Map notice</h2>
+							<p class="mt-0.5 max-w-[52ch] text-label font-normal text-fg-tertiary">
+								Shown on the public map, then it collapses to a warning sign. The text can be a curfew or any later notice. Severity sets the color.
+							</p>
+						</div>
+						<AlertTag message={noticeMessage.trim() || 'Curfew in progress'} severity={noticeSeverity} preview />
+					</div>
+					{#if !data.alertReady}
+						<div class="mt-3">
+							<Notice tone="warning" title="Notice storage is not ready">
+								Run supabase/site_alert.sql once in the Supabase SQL editor, then reload this page.
+							</Notice>
+						</div>
+					{:else}
+						<form method="POST" action="?/alert" class="mt-4 flex flex-col gap-3.5">
+							<input type="hidden" name="active" value={noticeOn ? 'true' : 'false'} />
+							<input type="hidden" name="severity" value={noticeSeverity} />
+							<SegmentedControl
+								label="Notice visibility"
+								value={noticeOn ? 'on' : 'off'}
+								onchange={(value) => (noticeOn = value === 'on')}
+								options={[
+									{ value: 'off', label: 'Hidden' },
+									{ value: 'on', label: 'On the map' }
+								]}
+							/>
+							<label class="flex flex-col gap-1.5 text-label font-bold text-fg-secondary">
+								<span class="flex items-baseline justify-between gap-3">
+									Message
+									<span class="num font-normal text-fg-tertiary">{noticeMessage.length}/{SITE_ALERT_MAX}</span>
+								</span>
+								<input
+									class={input}
+									name="message"
+									maxlength={SITE_ALERT_MAX}
+									required
+									placeholder="Curfew in progress"
+									bind:value={noticeMessage}
+								/>
+							</label>
+							<div>
+								<p class="mb-1.5 text-label font-bold text-fg-secondary">Severity</p>
+								<div role="radiogroup" aria-label="Severity" class="grid grid-cols-2 gap-1 rounded-[14px] border border-line-subtle bg-surface-raised p-[3px] sm:grid-cols-4">
+									{#each SEVERITIES as item (item)}
+										{@const on = item === noticeSeverity}
+										<button
+											type="button"
+											role="radio"
+											aria-checked={on}
+											class="flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-[11px] px-2 text-label font-bold {on
+												? 'text-fg'
+												: 'text-fg-secondary hover:text-fg'}"
+											style={on
+												? `background:color-mix(in oklab, var(--color-sev-${item}) 18%, transparent);box-shadow:inset 0 0 0 2px var(--color-sev-${item})`
+												: ''}
+											onclick={() => (noticeSeverity = item)}
+										>
+											<SeverityMeter severity={item} size={14} />
+											<span class="truncate">{SEVERITY_META[item].label}</span>
+										</button>
+									{/each}
+								</div>
+							</div>
+							{#if form?.alertSaved}<Notice tone="success">Notice updated. The map picks it up on its own.</Notice>{/if}
+							<div><Button type="submit">Save notice</Button></div>
+						</form>
+					{/if}
+				</section>
 				<div class="flex flex-wrap items-end justify-between gap-3">
 					<div>
 						<h1 class="text-title-lg font-heavy lg:text-[28px] lg:leading-[34px]">Reports</h1>

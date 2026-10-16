@@ -5,16 +5,17 @@ Every file is safe to run more than once.
 
 ## ⏳ Pending: run these when you have time
 
-The app is already deployed and works without them. These two scripts switch on rate limits and source links.
+The app is already deployed and works without them. These scripts switch on rate limits, source links, and the map notice.
 
 | Order | File | What it does |
 |---|---|---|
 | 1 | [`rate_limits.sql`](rate_limits.sql) | Limits how often one device can send SOS and reports |
 | 2 | [`source_links.sql`](source_links.sql) | Lets a report link to where it was seen (e.g. a Mopays Facebook video) |
+| 3 | [`site_alert.sql`](site_alert.sql) | Lets /admin put a collapsible notice on the map (message + severity color) |
 
-Run them in this order: `source_links.sql` builds on the version of `create_incident` from `rate_limits.sql`.
+Run 1 then 2: `source_links.sql` builds on the version of `create_incident` from `rate_limits.sql`. `site_alert.sql` can run any time.
 
-When both are done, delete this "Pending" section.
+When all three are done, delete this "Pending" section.
 
 ### Rate limits (`rate_limits.sql`)
 
@@ -86,3 +87,4 @@ For a new Supabase project, run in this order:
 5. `zones.sql`
 6. `rate_limits.sql`
 7. `source_links.sql`
+8. `site_alert.sql`

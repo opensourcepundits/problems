@@ -142,6 +142,29 @@ export type Database = {
 				Update: never;
 				Relationships: [];
 			};
+			site_alerts: {
+				Row: {
+					id: number;
+					active: boolean;
+					message: string;
+					severity: Database['public']['Enums']['incident_severity'];
+					updated_at: string;
+				};
+				Insert: {
+					id?: number;
+					active?: boolean;
+					message?: string;
+					severity?: Database['public']['Enums']['incident_severity'];
+					updated_at?: string;
+				};
+				Update: {
+					active?: boolean;
+					message?: string;
+					severity?: Database['public']['Enums']['incident_severity'];
+					updated_at?: string;
+				};
+				Relationships: [];
+			};
 		};
 		Views: {
 			[_ in never]: never;

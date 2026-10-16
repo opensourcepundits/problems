@@ -3,11 +3,14 @@ import {
 	adminConfig,
 	clearAdminSession,
 	credentialsMatch,
+	getSiteAlert,
 	hasAdminSession,
 	listIncidents,
 	setAdminSession,
-	setIncidentHidden
+	setIncidentHidden,
+	setSiteAlert
 } from '$lib/server/admin';
+import { DEFAULT_SITE_ALERT, isSeverity } from '$lib/types';
 import type { Actions, PageServerLoad } from './$types';
 
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -19,18 +22,25 @@ function secure(url: URL) {
 export const load: PageServerLoad = async ({ cookies }) => {
 	const configured = adminConfig() !== null;
 	const authed = configured && hasAdminSession(cookies);
-	if (!authed) return { configured, authed: false, incidents: [], error: '' };
+	if (!authed) return { configured, authed: false, incidents: [], error: '', alert: null, alertReady: false };
+	let incidents: Awaited<ReturnType<typeof listIncidents>> = [];
+	let error = '';
 	try {
-		const incidents = await listIncidents();
-		return { configured, authed: true, incidents, error: '' };
+		incidents = await listIncidents();
 	} catch (cause) {
-		return {
-			configured,
-			authed: true,
-			incidents: [],
-			error: cause instanceof Error ? cause.message : 'Could not load reports.'
-		};
+		error = cause instanceof Error ? cause.message : 'Could not load reports.';
 	}
+	let alert = DEFAULT_SITE_ALERT;
+	let alertReady = false;
+	try {
+		const notice = await getSiteAlert();
+		alert = notice.alert;
+		alertReady = notice.ready;
+	} catch (cause) {
+		const message = cause instanceof Error ? cause.message : 'Could not load the notice.';
+		error = error ? `${error} ${message}` : message;
+	}
+	return { configured, authed: true, incidents, error, alert, alertReady };
 };
 
 export const actions: Actions = {
@@ -62,5 +72,21 @@ export const actions: Actions = {
 				error: cause instanceof Error ? cause.message : 'Could not update the report.'
 			});
 		}
+	},
+	alert: async ({ request, cookies }) => {
+		if (!hasAdminSession(cookies) || !adminConfig()) return fail(401, { error: 'Sign in again.' });
+		const form = await request.formData();
+		const message = String(form.get('message') ?? '');
+		const severity = String(form.get('severity') ?? '');
+		const active = String(form.get('active') ?? '') === 'true';
+		if (!isSeverity(severity)) return fail(400, { error: 'That severity is not valid.' });
+		try {
+			await setSiteAlert({ active, message, severity });
+		} catch (cause) {
+			return fail(400, {
+				error: cause instanceof Error ? cause.message : 'Could not update the notice.'
+			});
+		}
+		return { alertSaved: true };
 	}
 };

@@ -122,6 +122,24 @@ comment on table public.action_logs is
 comment on column public.action_logs.created_at is
   'Server timestamp set on insert. Clients cannot choose or change it.';
 
+-- One row. The public map shows it as a notice that collapses to a warning sign.
+-- Message is free text (curfew, cyclone, and so on). Severity picks the color.
+create table if not exists public.site_alerts (
+  id smallint primary key default 1 check (id = 1),
+  active boolean not null default false,
+  message text not null default 'Curfew in progress',
+  severity public.incident_severity not null default 'high',
+  updated_at timestamptz not null default now(),
+  constraint site_alerts_message_len check (char_length(message) between 1 and 120)
+);
+
+insert into public.site_alerts (id)
+values (1)
+on conflict (id) do nothing;
+
+comment on table public.site_alerts is
+  'Singleton public notice. Visitors read it; only the service role (admin panel) writes it.';
+
 -- ---------------------------------------------------------------------------
 -- 4. Indexes
 -- ---------------------------------------------------------------------------
@@ -782,6 +800,7 @@ alter table public.incidents enable row level security;
 alter table public.incident_comments enable row level security;
 alter table public.incident_confirmations enable row level security;
 alter table public.action_logs enable row level security;
+alter table public.site_alerts enable row level security;
 
 drop policy if exists profiles_select on public.profiles;
 create policy profiles_select on public.profiles
@@ -863,10 +882,17 @@ create policy action_logs_insert_own on public.action_logs
   for insert to authenticated
   with check (user_id = auth.uid());
 
+-- Anyone can read the notice, including when it is off, so the map can hide it live.
+-- No insert/update policy: writes go through the service role in /admin.
+drop policy if exists site_alerts_select_public on public.site_alerts;
+create policy site_alerts_select_public on public.site_alerts
+  for select to anon, authenticated
+  using (true);
+
 revoke update, delete, truncate on public.action_logs from public, anon, authenticated;
 
 grant usage on schema public to anon, authenticated;
-grant select on public.profiles, public.incidents, public.incident_comments, public.incident_confirmations to anon, authenticated;
+grant select on public.profiles, public.incidents, public.incident_comments, public.incident_confirmations, public.site_alerts to anon, authenticated;
 grant insert, update on public.profiles to authenticated;
 grant insert, update on public.incidents to anon, authenticated;
 grant insert, delete on public.incident_comments to anon, authenticated;
@@ -932,9 +958,14 @@ do $$ begin
 exception when duplicate_object then null;
 end $$;
 
+do $$ begin
+  alter publication supabase_realtime add table public.site_alerts;
+exception when duplicate_object then null;
+end $$;
+
 notify pgrst, 'reload schema';
 
--- Follow-up files, run in order after this one: anonymous.sql, admin.sql, squares.sql, zones.sql, rate_limits.sql, source_links.sql.
+-- Follow-up files, run in order after this one: anonymous.sql, admin.sql, squares.sql, zones.sql, rate_limits.sql, source_links.sql, site_alert.sql.
 -- rate_limits.sql and source_links.sql each replace create_incident (adding p_client_key, then p_source_url).
 
 -- Promote an operator in the SQL editor (users cannot set app_metadata themselves):

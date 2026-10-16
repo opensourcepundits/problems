@@ -27,7 +27,9 @@ const EXTRA: Record<Locale, Record<string, string>> = {
 		loc_timeout: 'Location request timed out. Try again with a clear sky view.',
 		not_configured: 'The live map is not connected yet.',
 		comment_failed: 'Could not post the update.',
-		vote_failed: 'Could not save your vote.'
+		vote_failed: 'Could not save your vote.',
+		alert_show: 'Show notice',
+		alert_hide: 'Hide notice'
 	},
 	fr: {
 		need_source: 'lien source',
@@ -50,7 +52,9 @@ const EXTRA: Record<Locale, Record<string, string>> = {
 		loc_timeout: 'La localisation a expiré. Réessayez à découvert.',
 		not_configured: 'La carte en direct n’est pas encore connectée.',
 		comment_failed: 'Impossible de publier la mise à jour.',
-		vote_failed: 'Impossible d’enregistrer votre vote.'
+		vote_failed: 'Impossible d’enregistrer votre vote.',
+		alert_show: 'Afficher l’avis',
+		alert_hide: 'Masquer l’avis'
 	},
 	mfe: {
 		need_source: 'lien sours',
@@ -73,7 +77,9 @@ const EXTRA: Record<Locale, Record<string, string>> = {
 		loc_timeout: 'Lokalizasion pa finn marse. Re-esey dan enn plas ouver.',
 		not_configured: 'Lakart an direk pa ankor konekte.',
 		comment_failed: 'Pa finn kapav pibliye nouvel la.',
-		vote_failed: 'Pa finn kapav anrezistre ou vot.'
+		vote_failed: 'Pa finn kapav anrezistre ou vot.',
+		alert_show: 'Montre lavi',
+		alert_hide: 'Kas lavi'
 	},
 	de: {
 		need_source: 'Quellenlink',
@@ -96,7 +102,9 @@ const EXTRA: Record<Locale, Record<string, string>> = {
 		loc_timeout: 'Standortabfrage abgelaufen. Versuchen Sie es im Freien erneut.',
 		not_configured: 'Die Live-Karte ist noch nicht verbunden.',
 		comment_failed: 'Update konnte nicht gesendet werden.',
-		vote_failed: 'Ihre Stimme konnte nicht gespeichert werden.'
+		vote_failed: 'Ihre Stimme konnte nicht gespeichert werden.',
+		alert_show: 'Hinweis anzeigen',
+		alert_hide: 'Hinweis ausblenden'
 	},
 	it: {
 		need_source: 'link alla fonte',
@@ -119,7 +127,9 @@ const EXTRA: Record<Locale, Record<string, string>> = {
 		loc_timeout: 'Posizione non trovata in tempo. Riprova all’aperto.',
 		not_configured: 'La mappa in diretta non è ancora collegata.',
 		comment_failed: 'Impossibile pubblicare l’aggiornamento.',
-		vote_failed: 'Impossibile salvare il tuo voto.'
+		vote_failed: 'Impossibile salvare il tuo voto.',
+		alert_show: 'Mostra l’avviso',
+		alert_hide: 'Nascondi l’avviso'
 	}
 };
 

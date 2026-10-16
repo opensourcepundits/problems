@@ -4,6 +4,7 @@ import { env as publicEnv } from '$env/dynamic/public';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Cookies } from '@sveltejs/kit';
 import type { Database } from '$lib/database.types';
+import { DEFAULT_SITE_ALERT, isSeverity, SITE_ALERT_MAX, type SiteAlert } from '$lib/types';
 
 const COOKIE = 'crisis_admin';
 const MAX_AGE = 60 * 60 * 12;
@@ -134,5 +135,54 @@ export async function setIncidentHidden(id: string, hidden: boolean) {
 	const supabase = adminClient();
 	if (!supabase) throw new Error('Admin database access is not configured.');
 	const { error } = await supabase.from('incidents').update({ hidden }).eq('id', id);
+	if (error) throw new Error(error.message);
+}
+
+function missingAlertTable(code: string | undefined) {
+	return code === 'PGRST205' || code === '42P01';
+}
+
+export async function getSiteAlert(): Promise<{ alert: SiteAlert; ready: boolean }> {
+	const supabase = adminClient();
+	if (!supabase) throw new Error('Admin database access is not configured.');
+	const { data, error } = await supabase
+		.from('site_alerts')
+		.select('active, message, severity')
+		.eq('id', 1)
+		.maybeSingle();
+	if (error) {
+		if (missingAlertTable(error.code)) return { alert: DEFAULT_SITE_ALERT, ready: false };
+		throw new Error(error.message);
+	}
+	if (!data || !isSeverity(data.severity)) return { alert: DEFAULT_SITE_ALERT, ready: true };
+	const message = data.message.trim();
+	return {
+		ready: true,
+		alert: {
+			active: data.active,
+			message: message || DEFAULT_SITE_ALERT.message,
+			severity: data.severity
+		}
+	};
+}
+
+export async function setSiteAlert(alert: SiteAlert) {
+	const supabase = adminClient();
+	if (!supabase) throw new Error('Admin database access is not configured.');
+	const message = alert.message.trim();
+	if (!message || message.length > SITE_ALERT_MAX) {
+		throw new Error(`The notice must be 1–${SITE_ALERT_MAX} characters.`);
+	}
+	if (!isSeverity(alert.severity)) throw new Error('That severity is not valid.');
+	const { error } = await supabase.from('site_alerts').upsert({
+		id: 1,
+		active: alert.active,
+		message,
+		severity: alert.severity,
+		updated_at: new Date().toISOString()
+	});
+	if (missingAlertTable(error?.code)) {
+		throw new Error('Run supabase/site_alert.sql in the Supabase SQL editor, then try again.');
+	}
 	if (error) throw new Error(error.message);
 }

@@ -48,6 +48,21 @@ export type IncidentComment = {
 	author_name: string | null;
 };
 
+/** One public map notice. The message is free text so it can be a curfew, a storm, or anything else. */
+export type SiteAlert = {
+	active: boolean;
+	message: string;
+	severity: Severity;
+};
+
+export const DEFAULT_SITE_ALERT: SiteAlert = {
+	active: false,
+	message: 'Curfew in progress',
+	severity: 'high'
+};
+
+export const SITE_ALERT_MAX = 120;
+
 export type Viewport = {
 	center: [number, number];
 	zoom: number;

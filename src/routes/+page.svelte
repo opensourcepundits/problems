@@ -20,6 +20,7 @@
 	import MapPinView from '$lib/components/MapPinView.svelte';
 	import PlaceSearch from '$lib/components/PlaceSearch.svelte';
 	import ReportModal from '$lib/components/ReportModal.svelte';
+	import AlertTag from '$lib/components/ui/AlertTag.svelte';
 	import BrandMark from '$lib/components/ui/BrandMark.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import IconButton from '$lib/components/ui/IconButton.svelte';
@@ -28,7 +29,7 @@
 	import SegmentedControl from '$lib/components/ui/SegmentedControl.svelte';
 	import SettingsPanel from '$lib/components/ui/SettingsPanel.svelte';
 	import { CATEGORY_ICON } from '$lib/components/ui/icons';
-	import { fetchIncidents } from '$lib/api';
+	import { fetchIncidents, fetchSiteAlert } from '$lib/api';
 	import { i18n, LOCALES, clockTime, t, timeAgo } from '$lib/i18n/index.svelte';
 	import { createSupabaseBrowserClient, supabaseConfigProblem } from '$lib/supabaseClient';
 	import { CATEGORY_META, MAP } from '$lib/tokens';
@@ -38,11 +39,16 @@
 		TIME_WINDOWS,
 		type Category,
 		type Incident,
+		type SiteAlert,
 		type TileBounds,
 		type Viewport
 	} from '$lib/types';
 	import type { PlaceHit } from '$lib/places';
 	import { chrome, mapCommand } from '$lib/ui.svelte';
+
+	let { data } = $props();
+	let liveAlert = $state<SiteAlert | null | undefined>(undefined);
+	const alert = $derived(liveAlert === undefined ? data.alert : liveAlert);
 
 	let mode = $state<'pins' | 'grid'>('pins');
 	let hours = $state(24);
@@ -233,11 +239,18 @@
 
 		const supabase = createSupabaseBrowserClient();
 		const refresh = () => void load();
+		const refreshAlert = () => {
+			if (!supabase) return;
+			void fetchSiteAlert(supabase)
+				.then((next) => (liveAlert = next))
+				.catch(() => undefined);
+		};
 		const channel = supabase
 			?.channel('crisis-feed')
 			.on('postgres_changes', { event: '*', schema: 'public', table: 'incidents' }, refresh)
 			.on('postgres_changes', { event: '*', schema: 'public', table: 'incident_comments' }, refresh)
 			.on('postgres_changes', { event: '*', schema: 'public', table: 'incident_confirmations' }, refresh)
+			.on('postgres_changes', { event: '*', schema: 'public', table: 'site_alerts' }, refreshAlert)
 			.subscribe();
 		return () => {
 			window.removeEventListener('online', goOnline);
@@ -480,6 +493,9 @@
 				{/if}
 			</div>
 		</div>
+		{#if alert?.active}
+			<div class="px-2 pb-1.5"><AlertTag message={alert.message} severity={alert.severity} bar /></div>
+		{/if}
 		<div class="border-t border-line-subtle {bounds && mode === 'pins' ? '' : 'pb-0.5'}">{@render chips()}</div>
 		{@render zoneRow()}
 		{#if configProblem || offline || error}
@@ -529,6 +545,9 @@
 			</div>
 			<Button icon={Plus} onclick={openReport}>{t('report_incident')}</Button>
 		</header>
+		{#if alert?.active}
+			<div class="px-4 pt-2"><AlertTag message={alert.message} severity={alert.severity} /></div>
+		{/if}
 		{#if configProblem || offline || error}
 			<div class="px-3 pt-2">{@render banner()}</div>
 		{/if}
