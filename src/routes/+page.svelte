@@ -432,7 +432,8 @@
 
 {#if !pickingPin}
 	<!-- Mobile top panel -->
-	<div class="glass absolute inset-x-2 top-[calc(env(safe-area-inset-top)+8px)] z-30 rounded-[18px] lg:hidden">
+	<div class="absolute inset-x-2 top-[calc(env(safe-area-inset-top)+8px)] z-30 lg:hidden">
+	<div class="glass rounded-[18px]">
 		<div class="flex h-14 items-center gap-2 pr-1.5 pl-2.5">
 			<button
 				type="button"
@@ -493,13 +494,16 @@
 				{/if}
 			</div>
 		</div>
-		{#if alert?.active}
-			<div class="px-2 pb-1.5"><AlertTag message={alert.message} severity={alert.severity} bar /></div>
-		{/if}
 		<div class="border-t border-line-subtle {bounds && mode === 'pins' ? '' : 'pb-0.5'}">{@render chips()}</div>
 		{@render zoneRow()}
 		{#if configProblem || offline || error}
 			<div class="px-1.5 pb-1.5">{@render banner()}</div>
+		{/if}
+	</div>
+		{#if alert?.active}
+			<div class="mt-2 flex justify-end">
+				<AlertTag message={alert.message} severity={alert.severity} />
+			</div>
 		{/if}
 	</div>
 
@@ -545,14 +549,16 @@
 			</div>
 			<Button icon={Plus} onclick={openReport}>{t('report_incident')}</Button>
 		</header>
-		{#if alert?.active}
-			<div class="px-4 pt-2"><AlertTag message={alert.message} severity={alert.severity} /></div>
-		{/if}
 		{#if configProblem || offline || error}
 			<div class="px-3 pt-2">{@render banner()}</div>
 		{/if}
-		<div class="flex items-start gap-2 px-1 py-2">
-			<div class="glass max-w-[calc(100%-80px)] overflow-hidden rounded-[14px] px-0.5">{@render chips()}</div>
+		<div class="flex items-center gap-2 py-2 {alert?.active ? 'pr-4 pl-1' : 'px-1'}">
+			<div class="glass min-w-0 overflow-hidden rounded-[14px] px-0.5 {alert?.active ? 'shrink' : 'max-w-[calc(100%-80px)]'}">
+				{@render chips()}
+			</div>
+			{#if alert?.active}
+				<AlertTag message={alert.message} severity={alert.severity} class="ml-auto shrink-0" />
+			{/if}
 		</div>
 		{#if bounds && mode === 'pins'}
 			<div class="glass ml-3 w-fit rounded-[14px] pt-1.5">{@render zoneRow()}</div>

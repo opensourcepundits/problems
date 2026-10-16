@@ -52,14 +52,11 @@
 	let {
 		message,
 		severity,
-		bar = false,
 		preview = false,
 		class: extra = ''
 	}: {
 		message: string;
 		severity: Severity;
-		/** Stretch to the row width while the text is showing. */
-		bar?: boolean;
 		/** Admin preview: fold on click, without the timer or saved state. */
 		preview?: boolean;
 		class?: string;
@@ -91,9 +88,7 @@
 	class="inline-flex h-11 min-w-11 max-w-full items-center overflow-hidden rounded-md border text-left transition-[max-width] duration-300 ease-out motion-reduce:transition-none {extra}"
 	style="--sev: var(--color-sev-{severity}); color: var(--sev); background: color-mix(in oklab, var(--sev) 18%, transparent); border-color: color-mix(in oklab, var(--sev) 55%, transparent); max-width: {folded
 		? '44px'
-		: bar
-			? '100%'
-			: 'min(360px, 100%)'}"
+		: 'min(360px, 100%)'}"
 	onclick={toggle}
 >
 	<span class="grid h-11 w-11 shrink-0 place-items-center" class:live-dot={folded && critical}>
